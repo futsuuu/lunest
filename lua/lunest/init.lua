@@ -1,16 +1,30 @@
+local lib_modname = 'lunest.lib'
+assert(arg[0] and not package.loaded[lib_modname])
 do
-  local modname = 'lunest.lib'
-  if not package.preload[modname] and not package.loaded[modname] then
-    local dll = (debug.getinfo(1, 'S').source:match('@(.+[/\\])') or '')
-      .. 'lunest'
-      .. (package.path:sub(1, 1) == '/' and '.so' or '.dll')
+  local dll = (debug.getinfo(1, 'S').source:match('@(.+[/\\])') or '')
+    .. 'lunest'
+    .. (package.path:sub(1, 1) == '/' and '.so' or '.dll')
 
-    local loader = assert(package.loadlib(dll, 'luaopen_lunest'))
-    package.preload[modname] = loader
-  end
+  local loader = assert(package.loadlib(dll, 'luaopen_lunest'))
+  package.loaded[lib_modname] = loader()
 end
 
-if arg[0] then
-  require('lunest.lib').cli({ arg[0], (unpack or table.unpack)(arg) })
-  return
+local lib = require('lunest.lib')
+
+local M = {}
+
+---@param name string
+---@param func function
+function M.test(name, func)
+  lib.test(name, func)
 end
+
+---@param name string
+---@param func function
+function M.group(name, func)
+  lib.group(name, func)
+end
+
+package.loaded.lunest = M
+
+lib.cli({ arg[0], (unpack or table.unpack)(arg) })
