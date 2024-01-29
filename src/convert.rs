@@ -1,8 +1,36 @@
-use std::path::PathBuf;
-
 use mlua::prelude::*;
 
-use super::{Group, IndexMap, Node, RootState, Test};
+use super::{ChildState, Group, IndexMap, Node, RootState, State, Test};
+
+impl IntoLua<'_> for State {
+    fn into_lua(self, lua: &'_ Lua) -> LuaResult<LuaValue<'_>> {
+        let table = lua.create_table()?;
+        match self {
+            Self::Root(r) => {
+                table.raw_push("root")?;
+                table.raw_push(r)?;
+            }
+            Self::Child(c) => {
+                table.raw_push("child")?;
+                table.raw_push(c)?;
+            }
+        }
+        table.into_lua(lua)
+    }
+}
+
+impl FromLua<'_> for State {
+    fn from_lua(value: LuaValue<'_>, lua: &'_ Lua) -> LuaResult<Self> {
+        let table = LuaTable::from_lua(value, lua)?;
+        let inner = table.raw_get(2)?;
+        let r = match table.raw_get::<_, String>(1)?.as_str() {
+            "root" => Self::Root(RootState::from_lua(inner, lua)?),
+            "child" => Self::Child(ChildState::from_lua(inner, lua)?),
+            _ => unreachable!(),
+        };
+        Ok(r)
+    }
+}
 
 impl IntoLua<'_> for RootState {
     fn into_lua(self, lua: &'_ Lua) -> LuaResult<LuaValue<'_>> {
@@ -15,12 +43,27 @@ impl IntoLua<'_> for RootState {
 
 impl FromLua<'_> for RootState {
     fn from_lua(value: LuaValue<'_>, lua: &'_ Lua) -> LuaResult<Self> {
-        let Ok(table) = LuaTable::from_lua(value, lua) else {
-            return Ok(Self::new());
-        };
+        let table = LuaTable::from_lua(value, lua)?;
         Ok(Self {
             group_stack: table.raw_get("group_stack")?,
             tests: table.raw_get("tests")?,
+        })
+    }
+}
+
+impl IntoLua<'_> for ChildState {
+    fn into_lua(self, lua: &'_ Lua) -> LuaResult<LuaValue<'_>> {
+        let table = lua.create_table()?;
+        table.raw_set("test", self.test)?;
+        table.into_lua(lua)
+    }
+}
+
+impl FromLua<'_> for ChildState {
+    fn from_lua(value: LuaValue<'_>, lua: &'_ Lua) -> LuaResult<Self> {
+        let table = LuaTable::from_lua(value, lua)?;
+        Ok(Self {
+            test: table.raw_get("test")?,
         })
     }
 }
@@ -47,7 +90,7 @@ impl FromLua<'_> for Node {
     fn from_lua(value: LuaValue<'_>, lua: &'_ Lua) -> LuaResult<Self> {
         let table = LuaTable::from_lua(value, lua)?;
         let inner = table.raw_get(2)?;
-        let r = match table.raw_get::<_, LuaString>(1)?.to_str()? {
+        let r = match table.raw_get::<_, String>(1)?.as_str() {
             "group" => Self::Group(Group::from_lua(inner, lua)?),
             "test" => Self::Test(Test::from_lua(inner, lua)?),
             _ => unreachable!(),
@@ -60,7 +103,6 @@ impl IntoLua<'_> for Group {
     fn into_lua(self, lua: &'_ Lua) -> LuaResult<LuaValue<'_>> {
         let table = lua.create_table()?;
         table.raw_set("name", self.name)?;
-        table.raw_set("file", self.file.map(|p| p.display().to_string()))?;
         table.raw_set("children", self.children)?;
         table.into_lua(lua)
     }
@@ -71,7 +113,6 @@ impl FromLua<'_> for Group {
         let table = LuaTable::from_lua(value, lua)?;
         Ok(Self {
             name: table.raw_get("name")?,
-            file: table.raw_get::<_, Option<String>>("file")?.map(PathBuf::from),
             children: table.raw_get("children")?,
         })
     }
