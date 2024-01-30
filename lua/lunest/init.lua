@@ -27,4 +27,4 @@ end
 
 package.loaded.lunest = M
 
-lib.cli({ arg[0], (unpack or table.unpack)(arg) })
+lib.main({ arg[0], (unpack or table.unpack)(arg) })

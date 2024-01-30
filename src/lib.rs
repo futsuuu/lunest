@@ -1,30 +1,32 @@
-mod convert;
+mod cli;
 
 use std::{
-    collections::HashMap,
+    borrow::Cow,
     env,
+    ops::DerefMut,
     path::{Path, PathBuf},
     process::Command,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use globwalk::GlobWalkerBuilder;
+use indexmap::IndexMap;
 use mlua::prelude::*;
 
 #[mlua::lua_module]
 fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
     lua.create_table_from([
         (
-            "cli",
+            "main",
             lua.create_function(|lua, args| {
-                let args = Cli::new(args);
-                match args.command {
-                    Subcommand::Test { name } => {
+                let cli = cli::Cli::new(args);
+                match cli.args.command {
+                    cli::Command::Test { name } => {
                         child_main(lua, name).into_lua_err()?;
                     }
-                    Subcommand::Run { lua_cmd, pattern } => {
+                    cli::Command::Run { lua_cmd, pattern } => {
                         let mut lua_cmd = lua_cmd.clone();
-                        lua_cmd.push(args.main_file);
+                        lua_cmd.push(cli.main_file);
                         root_main(lua, &pattern, lua_cmd).into_lua_err()?;
                     }
                 }
@@ -77,24 +79,27 @@ fn root_main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()>
         name.push(node.get_name().to_string());
         match node {
             Node::Group(g) => {
-                for key in &g.children.vec {
-                    let value = &g.children.map[key];
-                    spawn_children(value, name, lua_cmd)?;
+                for child in g.children.values() {
+                    spawn_children(child, name, lua_cmd)?;
                 }
             }
             Node::Test(_) => {
-                Command::new(&lua_cmd[0])
-                    .args(&lua_cmd[1..])
-                    .arg("test")
-                    .args(&name[1..])
-                    .status()?;
+                let mut cmd = Command::new(&lua_cmd[0]);
+                cmd.args(&lua_cmd[1..]).arg("test").args(&name[1..]);
+                let mut child = cmd.spawn().with_context(|| {
+                    format!("Failed to spawn `{}`", cmd.get_program().to_string_lossy())
+                })?;
+                let status = child.wait().with_context(|| {
+                    format!("Cannot get exit status of `{}`", command_to_string(&cmd))
+                })?;
+                println!("{}", status.success());
             }
-            Node::Default => unreachable!(),
         }
         name.pop();
         Ok(())
     }
     let state = State::get(lua)?;
+    let state = state.borrow::<State>()?;
     let state = state.as_root().unwrap();
     spawn_children(&state.tests, &mut Vec::new(), &lua_cmd)?;
 
@@ -110,45 +115,13 @@ fn child_main(lua: &Lua, test: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-#[derive(clap::Parser)]
-struct Cli {
-    #[arg(skip)]
-    main_file: String,
-    #[command(subcommand)]
-    command: Subcommand,
-}
-
-#[derive(clap::Subcommand)]
-enum Subcommand {
-    Run {
-        #[arg(long, short, num_args = 1.., default_values_t = [
-            String::from(r"{test,spec}/**/*.lua"),
-            String::from(r"*[-_\.]{test,spec}.lua"),
-        ])]
-        pattern: Vec<String>,
-        #[arg(long, default_value = "lua", num_args = 1.., allow_hyphen_values = true)]
-        lua_cmd: Vec<String>,
-    },
-    #[command(hide = true)]
-    Test {
-        name: Vec<String>,
-    },
-}
-
-impl Cli {
-    fn new(args: Vec<String>) -> Self {
-        use clap::Parser;
-        let mut cli = Self::parse_from(&args);
-        cli.main_file = args[0].clone();
-        cli
-    }
-}
-
 #[derive(Debug)]
 enum State {
     Root(RootState),
     Child(ChildState),
 }
+
+impl LuaUserData for State {}
 
 #[derive(Debug)]
 struct RootState {
@@ -164,8 +137,8 @@ struct ChildState {
 impl State {
     const REG_KEY: &'static str = concat!(env!("CARGO_PKG_NAME"), ".state");
 
-    fn get(lua: &Lua) -> LuaResult<Self> {
-        Self::from_lua(lua.named_registry_value(Self::REG_KEY)?, lua)
+    fn get(lua: &Lua) -> LuaResult<LuaAnyUserData> {
+        lua.named_registry_value(Self::REG_KEY)
     }
 
     fn set(self, lua: &Lua) -> LuaResult<()> {
@@ -186,7 +159,7 @@ impl RootState {
             group_stack: Vec::new(),
             tests: Node::Group(Group {
                 name: String::from("root"),
-                children: IndexMap::default(),
+                children: IndexMap::new(),
             }),
         }
     }
@@ -196,7 +169,7 @@ impl RootState {
         group
             .as_group_mut()?
             .children
-            .set(node.get_name().to_string(), node);
+            .insert(node.get_name().to_string(), node);
         Ok(())
     }
 }
@@ -207,10 +180,8 @@ impl ChildState {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 enum Node {
-    #[default]
-    Default,
     Group(Group),
     Test(Test),
 }
@@ -220,7 +191,6 @@ impl Node {
         match self {
             Self::Group(g) => &g.name,
             Self::Test(t) => &t.name,
-            Self::Default => unreachable!(),
         }
     }
 
@@ -262,12 +232,12 @@ struct Test {
 }
 
 fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
-    let mut state = State::get(lua)?;
-    match state {
+    let state = State::get(lua)?;
+    let mut state = state.borrow_mut::<State>()?;
+    match state.deref_mut() {
         State::Root(ref mut root_state) => {
             let node = Node::Test(Test { name });
             root_state.add_node(node)?;
-            state.set(lua)?;
         }
         State::Child(child_state) => {
             if child_state.test.first() != Some(&name) {
@@ -281,12 +251,13 @@ fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
 }
 
 fn group(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
-    let mut state = State::get(lua)?;
-    match state {
+    let state = State::get(lua)?;
+    let mut state = state.borrow_mut::<State>()?;
+    match state.deref_mut() {
         State::Root(ref mut root_state) => {
             let node = Node::Group(Group {
                 name: name.clone(),
-                children: IndexMap::default(),
+                children: IndexMap::new(),
             });
             root_state.add_node(node)?;
             root_state.group_stack.push(name.clone());
@@ -298,12 +269,13 @@ fn group(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
             child_state.test.remove(0);
         }
     }
-    state.set(lua)?;
+    drop(state);
 
     func.call(())?;
 
-    let mut state = State::get(lua)?;
-    match state {
+    let state = State::get(lua)?;
+    let mut state = state.borrow_mut::<State>()?;
+    match state.deref_mut() {
         State::Root(ref mut root_state) => {
             root_state.group_stack.pop();
         }
@@ -311,27 +283,17 @@ fn group(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
             child_state.test.insert(0, name);
         }
     }
-    state.set(lua)?;
 
     Ok(())
 }
 
-#[derive(Debug, Default)]
-pub struct IndexMap<K, V> {
-    vec: Vec<K>,
-    map: HashMap<K, V>,
-}
-
-impl<K, V> IndexMap<K, V>
-where
-    K: Eq + std::hash::Hash + Clone,
-{
-    fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.map.get_mut(key)
-    }
-
-    fn set(&mut self, key: K, value: V) {
-        self.map.insert(key.clone(), value);
-        self.vec.push(key);
-    }
+fn command_to_string(cmd: &Command) -> String {
+    format!(
+        "{} {}",
+        cmd.get_program().to_string_lossy(),
+        cmd.get_args()
+            .map(|s| s.to_string_lossy())
+            .collect::<Vec<Cow<'_, str>>>()
+            .join(" ")
+    )
 }
