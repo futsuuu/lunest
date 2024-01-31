@@ -1,11 +1,11 @@
 mod cli;
 
 use std::{
-    borrow::Cow,
     env,
+    io::{stdout, Write},
     ops::DerefMut,
     path::{Path, PathBuf},
-    process::{Command, exit},
+    process::{Command, Stdio, exit},
 };
 
 use anyhow::{bail, Context, Result};
@@ -85,14 +85,32 @@ fn root_main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()>
             }
             Node::Test(_) => {
                 let mut cmd = Command::new(&lua_cmd[0]);
-                cmd.args(&lua_cmd[1..]).arg("test").args(&name[1..]);
-                let mut child = cmd.spawn().with_context(|| {
-                    format!("Failed to spawn `{}`", cmd.get_program().to_string_lossy())
+                let name = &name[1..]; // Skip the "root" node
+                cmd.args(&lua_cmd[1..])
+                    .arg("test")
+                    .args(name)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped());
+
+                print!("{} ····· ", name.join(" ┃ "));
+                stdout().flush()?;
+
+                let child = cmd.spawn().with_context(|| {
+                    format!("Failed to spawn `{}`", command_to_string(&cmd))
                 })?;
-                let status = child.wait().with_context(|| {
-                    format!("Cannot get exit status of `{}`", command_to_string(&cmd))
+                let output = child.wait_with_output().with_context(|| {
+                    format!("Failed to get the output of `{}`", command_to_string(&cmd))
                 })?;
-                println!("{}", status.success());
+
+                if output.status.success() {
+                    println!("OK");
+                } else {
+                    println!("ERR");
+                    println!("{:─^30}", " stdout ");
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
+                    println!("{:─^30}", " stderr ");
+                    println!("{}", String::from_utf8_lossy(&output.stderr));
+                }
             }
         }
         name.pop();
@@ -108,7 +126,6 @@ fn root_main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()>
 
 fn child_main(lua: &Lua, test: Vec<String>) -> Result<()> {
     let mut test = test.clone();
-    println!("{}", test.join(" > "));
     let target_file = test.remove(0);
     State::Child(ChildState::new(test)).set(lua)?;
     lua.load(Path::new(&target_file)).exec()?;
@@ -298,8 +315,13 @@ fn command_to_string(cmd: &Command) -> String {
         "{} {}",
         cmd.get_program().to_string_lossy(),
         cmd.get_args()
-            .map(|s| s.to_string_lossy())
-            .collect::<Vec<Cow<'_, str>>>()
+            .map(|s| s.to_string_lossy().escape_debug().to_string())
+            .map(|s| if s.contains(' ') {
+                format!("\"{s}\"")
+            } else {
+                s
+            })
+            .collect::<Vec<String>>()
             .join(" ")
     )
 }
