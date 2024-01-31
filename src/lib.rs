@@ -5,7 +5,7 @@ use std::{
     env,
     ops::DerefMut,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, exit},
 };
 
 use anyhow::{bail, Context, Result};
@@ -243,7 +243,13 @@ fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
             if child_state.test.first() != Some(&name) {
                 return Ok(());
             }
-            func.call(())?;
+            match func.call(()) {
+                Err(LuaError::RuntimeError(e)) => {
+                    eprintln!("{e}");
+                    exit(1);
+                }
+                r => r?,
+            }
         }
     }
 
