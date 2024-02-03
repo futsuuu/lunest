@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use mlua::prelude::*;
 
-use crate::{node::Group, Node, NodeID, NodeName};
+use crate::{Node, NodeID, NodeName};
 
 #[derive(Debug)]
 pub enum State {
@@ -39,8 +39,8 @@ pub struct MainState {
 impl MainState {
     pub fn new() -> Self {
         Self {
-            root: Group::new("root").into(),
-            current_group: Vec::new(),
+            root: Node::root(),
+            current_group: NodeID::root(),
         }
     }
 
@@ -51,8 +51,8 @@ impl MainState {
         Ok(())
     }
 
-    pub fn move_to_child(&mut self, name: NodeName) {
-        self.current_group.push(name);
+    pub fn move_to_child(&mut self, name: NodeName) -> Result<()> {
+        self.current_group.push(&name)
     }
 
     pub fn move_to_parent(&mut self) {
@@ -70,7 +70,7 @@ impl MainState {
                 return Ok(node);
             };
             let node_name = node.get_name().to_string();
-            let Some(child) = node.as_group_mut()?.children.get_mut(child_name) else {
+            let Some(child) = node.as_group_mut()?.children.get_mut(&child_name) else {
                 bail!("Failed to get {child_name} from {node_name}");
             };
             inner(child, node_id, depth + 1)
@@ -94,11 +94,13 @@ impl ChildState {
     }
 
     pub fn is_target(&self, name: &NodeName) -> bool {
-        self.target.get(self.depth).unwrap() == name
+        &self.target.get(self.depth).unwrap() == name
     }
 
-    pub fn move_to_child(&mut self) {
+    pub fn move_to_child(&mut self) -> Option<NodeName> {
+        let r = self.target.get(self.depth);
         self.depth += 1;
+        r
     }
 
     pub fn move_to_parent(&mut self) {

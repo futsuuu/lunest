@@ -1,3 +1,6 @@
+mod id;
+mod name;
+
 use std::{
     io::{stdout, Write},
     process::{Command, Stdio},
@@ -6,8 +9,8 @@ use std::{
 use anyhow::{bail, Context, Result};
 use indexmap::IndexMap;
 
-pub type Name = String;
-pub type ID = Vec<Name>;
+pub use id::ID;
+pub use name::Name;
 
 #[derive(Debug)]
 pub enum Node {
@@ -16,6 +19,12 @@ pub enum Node {
 }
 
 impl Node {
+    const ROOT: &'static str = "__root__";
+
+    pub fn root() -> Self {
+        Group::new(Self::ROOT.to_string().into()).into()
+    }
+
     pub fn get_name(&self) -> &Name {
         match self {
             Self::Group(g) => &g.name,
@@ -31,11 +40,14 @@ impl Node {
     }
 
     pub fn spawn_tests(&self, lua_cmd: &[String]) -> Result<()> {
-        self.spawn_tests_inner(&mut ID::new(), lua_cmd)
+        self.spawn_tests_inner(&mut ID::root(), lua_cmd)
     }
 
     fn spawn_tests_inner(&self, node_id: &mut ID, lua_cmd: &[String]) -> Result<()> {
-        node_id.push(self.get_name().to_string());
+        let name = self.get_name();
+        if name.to_string().as_str() != Self::ROOT {
+            node_id.push(name)?;
+        }
         match self {
             Node::Group(g) => {
                 for child in g.children.values() {
@@ -70,15 +82,15 @@ pub struct Group {
 }
 
 impl Group {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: Name) -> Self {
         Group {
-            name: Name::from(name),
+            name,
             children: IndexMap::new(),
         }
     }
 
     pub fn insert_node(&mut self, node: Node) {
-        self.children.insert(node.get_name().to_string(), node);
+        self.children.insert(node.get_name().clone(), node);
     }
 }
 
@@ -88,7 +100,7 @@ pub struct Test {
 }
 
 impl Test {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: String) -> Self {
         Test {
             name: Name::from(name),
         }
@@ -97,14 +109,13 @@ impl Test {
 
 fn spawn_test(node_id: &ID, lua_cmd: &[String]) -> Result<()> {
     let mut cmd = Command::new(&lua_cmd[0]);
-    let node_id = &node_id[1..]; // Skip the root node
     cmd.args(&lua_cmd[1..])
         .arg("test")
-        .args(node_id)
+        .args(node_id.clone())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    print!("{} ····· ", node_id.join(" ┃ "));
+    print!("{} ····· ", node_id);
     stdout().flush()?;
 
     let child = cmd

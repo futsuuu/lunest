@@ -2,12 +2,7 @@ mod cli;
 mod node;
 mod state;
 
-use std::{
-    env,
-    ops::DerefMut,
-    path::{Path, PathBuf},
-    process::exit,
-};
+use std::{env, ops::DerefMut, path::PathBuf, process::exit};
 
 use anyhow::Result;
 use globwalk::GlobWalkerBuilder;
@@ -29,8 +24,8 @@ fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
                         lua_cmd.push(cli.main_file);
                         main(lua, &pattern, lua_cmd).into_lua_err()?;
                     }
-                    cli::Command::Test { name } => {
-                        child_main(lua, name).into_lua_err()?;
+                    cli::Command::Test { id } => {
+                        child_main(lua, NodeID::from(id)).into_lua_err()?;
                     }
                 }
                 Ok(())
@@ -45,8 +40,8 @@ fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
         ),
         (
             "group",
-            lua.create_function(|lua, (name, func)| {
-                group(lua, name, func).into_lua_err()?;
+            lua.create_function(|lua, (name, func): (String, LuaFunction)| {
+                group(lua, NodeName::from(name), func).into_lua_err()?;
                 Ok(())
             })?,
         ),
@@ -68,8 +63,8 @@ fn main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()> {
             lua,
             path.strip_prefix(&cwd)
                 .unwrap_or(&path)
-                .display()
-                .to_string(),
+                .to_path_buf()
+                .into(),
             lua.create_function(move |lua, _: ()| lua.load(path.as_path()).exec())?,
         )?;
     }
@@ -82,22 +77,24 @@ fn main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()> {
 }
 
 fn child_main(lua: &Lua, test: NodeID) -> Result<()> {
-    let mut test = test.clone();
-    let target_file = test.remove(0);
-    State::Child(ChildState::new(test)).set(lua)?;
-    lua.load(Path::new(&target_file)).exec()?;
+    let mut child_state = ChildState::new(test);
+    let target_file = child_state.move_to_child().unwrap();
+    let target_file = target_file.as_path().unwrap().to_path_buf();
+
+    State::Child(child_state).set(lua)?;
+    lua.load(target_file).exec()?;
     Ok(())
 }
 
-fn test(lua: &Lua, name: NodeName, func: LuaFunction) -> Result<()> {
+fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
     let state = State::get(lua)?;
     let mut state = state.borrow_mut::<State>()?;
     match state.deref_mut() {
         State::Main(ref mut root_state) => {
-            root_state.insert_node(Test::new(&name))?;
+            root_state.insert_node(Test::new(name))?;
         }
         State::Child(child_state) => {
-            if !child_state.is_target(&name) {
+            if !child_state.is_target(&name.into()) {
                 return Ok(());
             }
             if let Err(e) = func.call::<_, ()>(()) {
@@ -115,8 +112,8 @@ fn group(lua: &Lua, name: NodeName, func: LuaFunction) -> Result<()> {
     let mut state = state.borrow_mut::<State>()?;
     match state.deref_mut() {
         State::Main(ref mut main_state) => {
-            main_state.insert_node(Group::new(&name))?;
-            main_state.move_to_child(name);
+            main_state.insert_node(Group::new(name.clone()))?;
+            main_state.move_to_child(name)?;
         }
         State::Child(ref mut child_state) => {
             if !child_state.is_target(&name) {

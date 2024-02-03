@@ -21,7 +21,7 @@ pub enum Command {
         lua_cmd: Vec<String>,
     },
     #[command(hide = true)]
-    Test { name: Vec<String> },
+    Test { id: Vec<String> },
 }
 
 impl Cli {
