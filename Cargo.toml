@@ -1,20 +1,38 @@
-[package]
-name = "lunest"
+[workspace]
+members = [
+  ".",
+  "crates/*",
+]
+
+[workspace.package]
 version = "0.0.0"
 edition = "2021"
+
+[workspace.dependencies]
+mlua = "0.9.5"
+anyhow = "1.0.79"
+clap = { version = "4.4.18", features = ["derive"] }
+
+[package]
+name = "lunest"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-anyhow = "1.0.79"
-mlua = { version = "0.9.4", features = ["module"] }
-clap = { version = "4.4.18", features = ["derive"] }
+macros = { path = "crates/macros" }
+anyhow = { workspace = true }
+mlua = { workspace = true, features = ["module"] }
+clap = { workspace = true }
 globwalk = "0.9.1"
 indexmap = "2.2.1"
+scopeguard = "1.2.0"  # used in `macros` crate
 
 [features]
-default = ["luajit"]
+default = ["test"]
+test = ["macros/test"]
 lua51 = ["mlua/lua51"]
 lua52 = ["mlua/lua52"]
 lua53 = ["mlua/lua53"]
