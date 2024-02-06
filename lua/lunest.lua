@@ -2,7 +2,7 @@ local lib_modname = 'lunest.lib'
 assert(arg[0] and not package.loaded[lib_modname])
 do
   local dll = (debug.getinfo(1, 'S').source:match('@(.+[/\\])') or '')
-    .. 'lunest'
+    .. 'lunest_lib'
     .. (package.path:sub(1, 1) == '/' and '.so' or '.dll')
 
   local loader = assert(package.loadlib(dll, 'luaopen_lunest'))

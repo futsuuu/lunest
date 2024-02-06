@@ -1,5 +1,5 @@
 [alias]
-xtask = "run --package xtask --"
+xtask = "run --package xtask --features"
 
 [target.x86_64-apple-darwin]
 rustflags = [

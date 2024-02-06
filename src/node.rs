@@ -8,6 +8,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use indexmap::IndexMap;
+use shared::command_to_string;
 
 pub use id::ID;
 pub use name::Name;
@@ -136,20 +137,4 @@ fn spawn_test(node_id: &ID, lua_cmd: &[String]) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn command_to_string(cmd: &Command) -> String {
-    format!(
-        "{} {}",
-        cmd.get_program().to_string_lossy(),
-        cmd.get_args()
-            .map(|s| s.to_string_lossy().escape_debug().to_string())
-            .map(|s| if s.contains(' ') {
-                format!("\"{s}\"")
-            } else {
-                s
-            })
-            .collect::<Vec<String>>()
-            .join(" ")
-    )
 }

@@ -1,5 +1,5 @@
 use std::{
-    env::{consts::*, current_dir},
+    env::consts::*,
     ffi::OsStr,
     fs,
     io::{BufRead, BufReader},
@@ -12,7 +12,6 @@ use clap::Parser as _;
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    sep();
     args.main()?;
     Ok(())
 }
@@ -46,6 +45,7 @@ impl Args {
         let mut cmd = Command::new(env!("CARGO"));
         cmd.args(["build", "--message-format", "json-render-diagnostics"]);
         set_features(&mut cmd, test);
+        sep(&cmd);
 
         let mut child = cmd.stdout(Stdio::piped()).spawn()?;
         let mut reader = BufReader::new(child.stdout.take().unwrap());
@@ -57,11 +57,7 @@ impl Args {
             let Ok(artifact) = get_artifact(&buffer) else {
                 continue;
             };
-            let mut target = current_dir()?.join("lua").join("lunest").join("lunest.so");
-            if DLL_EXTENSION == "dll" {
-                target.set_extension("dll");
-            }
-            fs::copy(artifact, target)?;
+            fs::copy(artifact, shared::dll_path())?;
         }
         let status = child.wait()?;
         if !status.success() {
@@ -73,35 +69,19 @@ impl Args {
 
     fn test(&self) -> Result<()> {
         self.build(true)?;
-        sep();
         let mut cmd = Command::new(env!("CARGO"));
         cmd.arg("test");
         set_features(&mut cmd, true);
+        sep(&cmd);
         cmd.status()?;
         Ok(())
     }
 }
 
 fn set_features(cmd: &mut Command, test: bool) {
-    cmd.arg("--no-default-features");
     cmd.args([
         "--features",
-        #[cfg(feature = "lua51")]
-        "lua51",
-        #[cfg(feature = "lua52")]
-        "lua52",
-        #[cfg(feature = "lua53")]
-        "lua53",
-        #[cfg(feature = "lua54")]
-        "lua54",
-        #[cfg(feature = "luajit")]
-        "luajit",
-        #[cfg(feature = "luajit52")]
-        "luajit52",
-        #[cfg(feature = "luau")]
-        "luau",
-        #[cfg(feature = "luau-jit")]
-        "luau-jit",
+        macros::lua_feature!(),
     ]);
     if test {
         cmd.args(["--features", "test"]);
@@ -124,6 +104,6 @@ fn get_artifact(json: &str) -> Result<PathBuf> {
     bail!("not found");
 }
 
-fn sep() {
-    println!("────────────");
+fn sep(cmd: &Command) {
+    println!("\n──────────── {}", shared::command_to_string(cmd));
 }

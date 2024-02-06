@@ -148,7 +148,17 @@ fn group(lua: &Lua, name: NodeName, func: LuaFunction) -> Result<()> {
 #[cfg(test)]
 fn lua_eval(lua_code: &str) -> std::process::Output {
     std::process::Command::new(env!("CARGO"))
-        .args(["run", "-p", "xtask", "--bin", "lua_rt", "--", lua_code])
+        .args([
+            "run",
+            "--package",
+            "xtask",
+            "--bin",
+            "lua_rt",
+            "--features",
+            macros::lua_feature!(),
+            "--",
+            lua_code,
+        ])
         .output()
         .expect("failed to execute process")
 }

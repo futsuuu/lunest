@@ -1,5 +1,7 @@
 use proc_macro::TokenStream;
 
+use quote::quote;
+
 /// Register a function as an entrypoint of a Lua module and generate a test that
 /// calls that function from Lua.
 ///
@@ -13,7 +15,7 @@ use proc_macro::TokenStream;
 ///         .output()
 ///         .expect("failed to execute process")
 /// }
-/// 
+///
 /// #[lua_module_test(lua_eval)]
 /// fn test(lua: &mlua::Lua) -> mlua::Result<()> {
 ///     lua.globals()
@@ -26,7 +28,6 @@ use proc_macro::TokenStream;
 #[proc_macro_attribute]
 pub fn lua_module_test(attr: TokenStream, item: TokenStream) -> TokenStream {
     use proc_macro2::{Ident, Span};
-    use quote::quote;
     use syn::parse_macro_input;
 
     let spawner = parse_macro_input!(attr as syn::Expr);
@@ -48,12 +49,10 @@ pub fn lua_module_test(attr: TokenStream, item: TokenStream) -> TokenStream {
     let lua_ident = Ident::new(&format!("{ident}{hash}"), Span::call_site());
 
     let lua_code = {
-        let dll = std::env::current_dir()
-            .unwrap()
-            .join("lua")
-            .join("lunest")
-            .join("lunest.dll");
-        let dll = dll.to_string_lossy().to_string().replace('\\', "/");
+        let dll = shared::dll_path()
+            .to_string_lossy()
+            .to_string()
+            .replace('\\', "/");
         format!("assert(package.loadlib('{dll}', 'luaopen_{lua_ident}'))()")
     };
 
@@ -96,4 +95,29 @@ pub fn lua_module_test(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn lua_module_test(_attr: TokenStream, _item: TokenStream) -> TokenStream {
     TokenStream::new()
+}
+
+#[proc_macro]
+pub fn lua_feature(_attr: TokenStream) -> TokenStream {
+    quote! {
+        {
+            #[cfg(feature = "lua51")]
+            { "lua51" }
+            #[cfg(feature = "lua52")]
+            { "lua52" }
+            #[cfg(feature = "lua53")]
+            { "lua53" }
+            #[cfg(feature = "lua54")]
+            { "lua54" }
+            #[cfg(feature = "luajit")]
+            { "luajit" }
+            #[cfg(feature = "luajit52")]
+            { "luajit52" }
+            #[cfg(feature = "luau")]
+            { "luau" }
+            #[cfg(feature = "luau-jit")]
+            { "luau-jit" }
+        }
+    }
+    .into()
 }

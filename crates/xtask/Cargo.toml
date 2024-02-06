@@ -5,13 +5,15 @@ edition.workspace = true
 default-run = "xtask"
 
 [dependencies]
+macros.workspace = true
+shared.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde_json = "1.0"
 mlua = { workspace = true, features = ["vendored"] }
 
 [features]
-default = ["lua51"]
+default = []
 lua51 = ["mlua/lua51"]
 lua52 = ["mlua/lua52"]
 lua53 = ["mlua/lua53"]

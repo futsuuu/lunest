@@ -339,6 +339,7 @@ dependencies = [
  "macros",
  "mlua",
  "scopeguard",
+ "shared",
 ]
 
 [[package]]
@@ -347,6 +348,7 @@ version = "0.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "shared",
  "syn",
 ]
 
@@ -522,6 +524,10 @@ dependencies = [
  "ryu",
  "serde",
 ]
+
+[[package]]
+name = "shared"
+version = "0.0.0"
 
 [[package]]
 name = "strsim"
@@ -744,6 +750,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
+ "macros",
  "mlua",
  "serde_json",
+ "shared",
 ]
