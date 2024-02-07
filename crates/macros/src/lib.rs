@@ -113,10 +113,6 @@ pub fn lua_feature(_attr: TokenStream) -> TokenStream {
             { "luajit" }
             #[cfg(feature = "luajit52")]
             { "luajit52" }
-            #[cfg(feature = "luau")]
-            { "luau" }
-            #[cfg(feature = "luau-jit")]
-            { "luau-jit" }
         }
     }
     .into()
