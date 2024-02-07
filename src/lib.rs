@@ -151,8 +151,6 @@ fn lua_eval(lua_code: &str) -> std::process::Output {
         .args([
             "run",
             "--package",
-            "xtask",
-            "--bin",
             "lua_rt",
             "--features",
             macros::lua_feature!(),

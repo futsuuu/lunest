@@ -10,15 +10,14 @@ shared.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde_json = "1.0"
-mlua = { workspace = true, features = ["vendored"] }
 
 [features]
 default = []
-lua51 = ["mlua/lua51"]
-lua52 = ["mlua/lua52"]
-lua53 = ["mlua/lua53"]
-lua54 = ["mlua/lua54"]
-luajit = ["mlua/luajit"]
-luajit52 = ["mlua/luajit52"]
-luau = ["mlua/luau"]
-luau-jit = ["mlua/luau-jit"]
+lua51 = []
+lua52 = []
+lua53 = []
+lua54 = []
+luajit = []
+luajit52 = []
+luau = []
+luau-jit = []
