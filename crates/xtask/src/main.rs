@@ -69,6 +69,15 @@ impl Args {
 
     fn test(&self) -> Result<()> {
         self.build(true)?;
+
+        let mut cmd = Command::new(env!("CARGO"));
+        cmd.args(["build", "--package", "lua_rt"]);
+        set_features(&mut cmd, false);
+        sep(&cmd);
+        if !cmd.status()?.success() {
+            bail!("build failed");
+        }
+
         let mut cmd = Command::new(env!("CARGO"));
         cmd.arg("test");
         set_features(&mut cmd, true);

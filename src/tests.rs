@@ -22,6 +22,7 @@ fn lua_eval(lua_code: &str) -> std::process::Output {
     std::process::Command::new(env!("CARGO"))
         .args([
             "run",
+            "--quiet", // "lua_rt" package was already built by "xtask"
             "--package",
             "lua_rt",
             "--features",
