@@ -1,12 +1,13 @@
 mod cli;
 mod node;
 mod state;
+#[cfg(feature = "test")]
+mod tests;
 
 use std::{env, ops::DerefMut, path::PathBuf, process::exit};
 
 use anyhow::Result;
 use globwalk::GlobWalkerBuilder;
-use macros::lua_module_test;
 use mlua::prelude::*;
 
 use node::{Group, Name as NodeName, Node, Test, ID as NodeID};
@@ -47,14 +48,6 @@ fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
             })?,
         ),
     ])
-}
-
-#[lua_module_test(lua_eval)]
-fn hello_world(lua: &Lua) -> LuaResult<()> {
-    lua.globals().set("number", 1)?;
-    let num = lua.globals().get::<_, LuaInteger>("number")?;
-    assert_eq!(1, num);
-    Ok(())
 }
 
 fn main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()> {
@@ -143,20 +136,4 @@ fn group(lua: &Lua, name: NodeName, func: LuaFunction) -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-fn lua_eval(lua_code: &str) -> std::process::Output {
-    std::process::Command::new(env!("CARGO"))
-        .args([
-            "run",
-            "--package",
-            "lua_rt",
-            "--features",
-            macros::lua_feature!(),
-            "--",
-            lua_code,
-        ])
-        .output()
-        .expect("failed to execute process")
 }

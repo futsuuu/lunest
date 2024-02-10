@@ -31,11 +31,11 @@ mlua = { workspace = true, features = ["module"] }
 clap = { workspace = true }
 globwalk = "0.9.1"
 indexmap = "2.2.1"
-scopeguard = "1.2.0"  # used in `macros` crate
+scopeguard = { version = "1.2.0", optional = true }  # used in `macros` crate
 
 [features]
 default = ["test"]
-test = ["macros/test"]
+test = ["macros/test", "dep:scopeguard", "mlua/macros"]
 lua51 = ["mlua/lua51"]
 lua52 = ["mlua/lua52"]
 lua53 = ["mlua/lua53"]
