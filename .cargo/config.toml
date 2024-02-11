@@ -1,2 +1,2 @@
 [alias]
-xtask = "run --package xtask --features"
+xtask = "run --package xtask --no-default-features --features"

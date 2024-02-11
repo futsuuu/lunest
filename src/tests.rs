@@ -19,19 +19,13 @@ fn hello_world(lua: &Lua) -> LuaResult<()> {
 
 #[cfg(test)]
 fn lua_eval(lua_code: &str) -> std::process::Output {
-    std::process::Command::new(env!("CARGO"))
-        .args([
-            "run",
-            "--quiet", // "lua_rt" package was already built by "xtask"
-            "--package",
-            "lua_rt",
-            "--features",
-            macros::lua_feature!(),
-            "--",
-            lua_code,
-        ])
-        .output()
-        .expect("failed to execute process")
+    std::process::Command::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/target/debug/lua_rt" // "lua_rt" package was already built by xtask
+    ))
+    .arg(lua_code)
+    .output()
+    .expect("failed to execute process")
 }
 
 fn test<'lua, F>(lua: &'lua Lua, name: &'_ str, func: F) -> LuaResult<()>

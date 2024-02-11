@@ -71,7 +71,7 @@ impl Args {
         self.build(true)?;
 
         let mut cmd = Command::new(env!("CARGO"));
-        cmd.args(["build", "--package", "lua_rt"]);
+        cmd.args(["build", "--package", "lua_rt", "--features", "vendored"]);
         set_features(&mut cmd, false);
         sep(&cmd);
         if !cmd.status()?.success() {
@@ -89,6 +89,7 @@ impl Args {
 
 fn set_features(cmd: &mut Command, test: bool) {
     cmd.args([
+        "--no-default-features",
         "--features",
         macros::lua_feature!(),
     ]);

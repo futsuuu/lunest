@@ -7,7 +7,7 @@ use quote::quote;
 ///
 /// If the `test` feature flag is disabled, this macro does not do anything.
 ///
-/// ```no_run
+/// ```ignore
 /// #[cfg(test)]
 /// fn lua_eval(lua_code: &str) -> std::process::Output {
 ///     std::process::Command::new("lua")
@@ -19,7 +19,7 @@ use quote::quote;
 /// #[lua_module_test(lua_eval)]
 /// fn test(lua: &mlua::Lua) -> mlua::Result<()> {
 ///     lua.globals()
-///         .get::<_, LuaFunction>("print")?
+///         .get::<_, mlua::Function>("print")?
 ///         .call("hello")?;
 ///     Ok(())
 /// }
