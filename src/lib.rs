@@ -63,10 +63,7 @@ fn main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()> {
     for path in target_files {
         group(
             lua,
-            path.strip_prefix(&cwd)
-                .unwrap_or(&path)
-                .to_path_buf()
-                .into(),
+            path.strip_prefix(&cwd).unwrap_or(&path).to_path_buf(),
             lua.create_function(move |lua, _: ()| lua.load(path.as_path()).exec())?,
         )?;
     }
@@ -92,8 +89,9 @@ fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
     let state = State::get(lua)?;
     let mut state = state.borrow_mut::<State>()?;
     match state.deref_mut() {
-        State::Main(ref mut root_state) => {
-            root_state.insert_node(Test::new(name))?;
+        State::Main(ref mut main_state) => {
+            let parent_id = main_state.current_group.clone();
+            main_state.insert_node(Test::new(parent_id, name)?)?;
         }
         State::Child(child_state) => {
             if !child_state.is_target(&name.into()) {
@@ -109,12 +107,14 @@ fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
     Ok(())
 }
 
-fn group(lua: &Lua, name: NodeName, func: LuaFunction) -> Result<()> {
+fn group<N: Into<NodeName>>(lua: &Lua, name: N, func: LuaFunction) -> Result<()> {
+    let name = name.into();
     let state = State::get(lua)?;
     let mut state = state.borrow_mut::<State>()?;
     match state.deref_mut() {
         State::Main(ref mut main_state) => {
-            main_state.insert_node(Group::new(name.clone()))?;
+            let parent_id = main_state.current_group.clone();
+            main_state.insert_node(Group::new(parent_id, name.clone())?)?;
             main_state.move_to_child(name)?;
         }
         State::Child(ref mut child_state) => {

@@ -40,13 +40,14 @@ where
     .into_lua_err()
 }
 
-fn group<'lua, F>(lua: &'lua Lua, name: &'_ str, func: F) -> LuaResult<()>
+fn group<'lua, N, F>(lua: &'lua Lua, name: N, func: F) -> LuaResult<()>
 where
+    N: Into<NodeName>,
     F: Fn(&'lua Lua) -> LuaResult<()> + 'static,
 {
     crate::group(
         lua,
-        NodeName::from(name.to_string()),
+        name.into(),
         lua.create_function(move |lua, _: ()| func(lua))?,
     )
     .into_lua_err()

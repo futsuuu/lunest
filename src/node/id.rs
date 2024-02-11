@@ -23,10 +23,18 @@ impl ID {
 
     pub fn get(&self, index: usize) -> Option<Name> {
         if index == 0 {
-            self.path.clone().map(Name::from)
+            self.path.as_ref().map(|p| Name::from(p.to_path_buf()))
         } else {
             self.names.get(index - 1).map(|s| Name::from(s.to_string()))
         }
+    }
+
+    pub fn name(&self) -> Option<Name> {
+        self.get(self.names.len())
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.get(0).is_none()
     }
 
     pub fn push(&mut self, item: &Name) -> Result<()> {

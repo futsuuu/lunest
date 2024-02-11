@@ -18,7 +18,7 @@ where
     Ok(())
 }
 
-mod load_test {
+mod execute_test {
     use super::*;
 
     #[lua_module_test(lua_eval)]
@@ -27,7 +27,7 @@ mod load_test {
 
         test(lua, "test", |lua| lua.globals().set("executed", true))?;
 
-        assert_eq!(true, lua.globals().get::<_, bool>("executed")?);
+        assert!(lua.globals().get::<_, bool>("executed")?);
 
         Ok(())
     }
@@ -46,7 +46,7 @@ mod load_test {
             })
         })?;
 
-        assert_eq!(true, lua.globals().get::<_, bool>("executed")?);
+        assert!(lua.globals().get::<_, bool>("executed")?);
 
         Ok(())
     }
@@ -66,7 +66,7 @@ fn ignore_other_group(lua: &Lua) -> LuaResult<()> {
         unreachable!();
     })?;
 
-    assert_eq!(true, lua.globals().get::<_, bool>("executed")?);
+    assert!(lua.globals().get::<_, bool>("executed")?);
 
     Ok(())
 }

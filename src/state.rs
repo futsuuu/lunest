@@ -33,7 +33,7 @@ impl State {
 #[derive(Debug)]
 pub struct MainState {
     pub root: Node,
-    current_group: NodeID,
+    pub current_group: NodeID,
 }
 
 impl MainState {
@@ -69,9 +69,9 @@ impl MainState {
                 // node_id.len() ≦ depth
                 return Ok(node);
             };
-            let node_name = node.get_name().to_string();
+            let id = node.id().to_string();
             let Some(child) = node.as_group_mut()?.children.get_mut(&child_name) else {
-                bail!("Failed to get {child_name} from {node_name}");
+                bail!("Failed to get {child_name} from {id}");
             };
             inner(child, node_id, depth + 1)
         }

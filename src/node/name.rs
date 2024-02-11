@@ -1,4 +1,7 @@
-use std::{ffi::OsStr, path::PathBuf};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Name {
@@ -58,5 +61,17 @@ impl From<Name> for String {
 impl From<PathBuf> for Name {
     fn from(value: PathBuf) -> Self {
         Self::Path(value)
+    }
+}
+
+impl From<&'_ str> for Name {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<&'_ Path> for Name {
+    fn from(value: &Path) -> Self {
+        Self::Path(value.to_path_buf())
     }
 }
