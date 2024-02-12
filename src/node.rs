@@ -47,10 +47,10 @@ impl Node {
         }
     }
 
-    pub fn spawn_tests(&self, lua_cmd: &[String]) -> Result<()> {
+    pub fn spawn_tests(&self, lua_cmd: &[String], profile: &str) -> Result<()> {
         match self {
-            Node::Test(t) => t.spawn(lua_cmd),
-            Node::Group(g) => g.spawn_tests(lua_cmd),
+            Node::Test(t) => t.spawn(lua_cmd, profile),
+            Node::Group(g) => g.spawn_tests(lua_cmd, profile),
         }
     }
 }
@@ -95,9 +95,9 @@ impl Group {
         self.children.insert(node.id().name().unwrap(), node);
     }
 
-    fn spawn_tests(&self, lua_cmd: &[String]) -> Result<()> {
+    fn spawn_tests(&self, lua_cmd: &[String], profile: &str) -> Result<()> {
         for child in self.children.values() {
-            child.spawn_tests(lua_cmd)?;
+            child.spawn_tests(lua_cmd, profile)?;
         }
         Ok(())
     }
@@ -125,10 +125,11 @@ impl Test {
         Ok(Test { id })
     }
 
-    fn spawn(&self, lua_cmd: &[String]) -> Result<()> {
+    fn spawn(&self, lua_cmd: &[String], profile: &str) -> Result<()> {
         let mut cmd = Command::new(&lua_cmd[0]);
         cmd.args(&lua_cmd[1..])
             .arg("test")
+            .args(["--profile", profile])
             .args(self.id.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());

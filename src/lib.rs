@@ -1,4 +1,5 @@
 mod cli;
+mod config;
 mod node;
 mod state;
 #[cfg(feature = "test")]
@@ -10,6 +11,7 @@ use anyhow::Result;
 use globwalk::GlobWalkerBuilder;
 use mlua::prelude::*;
 
+use config::Config;
 use node::{Group, Name as NodeName, Node, Test, ID as NodeID};
 use state::{ChildState, MainState, State};
 
@@ -21,12 +23,14 @@ fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
             lua.create_function(|lua, args| {
                 let cli = cli::Cli::new(args);
                 match cli.args.command {
-                    cli::Command::Run { lua_cmd, pattern } => {
-                        let mut lua_cmd = lua_cmd.clone();
+                    cli::Command::Run { profile } => {
+                        let config = Config::load(lua, &profile)?;
+                        let mut lua_cmd = config.lua_cmd.clone();
                         lua_cmd.push(cli.main_file);
-                        main(lua, &pattern, lua_cmd).into_lua_err()?;
+                        main(lua, &profile, &config.pattern, lua_cmd).into_lua_err()?;
                     }
-                    cli::Command::Test { id } => {
+                    cli::Command::Test { id, profile } => {
+                        Config::load(lua, &profile)?;
                         child_main(lua, NodeID::from(id)).into_lua_err()?;
                     }
                 }
@@ -55,7 +59,12 @@ fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
     ])
 }
 
-fn main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()> {
+fn main(
+    lua: &Lua,
+    profile: &str,
+    patterns: &[String],
+    lua_cmd: Vec<String>,
+) -> Result<()> {
     let cwd = env::current_dir()?;
     let target_files = GlobWalkerBuilder::from_patterns(&cwd, patterns)
         .file_type(globwalk::FileType::FILE)
@@ -76,7 +85,11 @@ fn main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()> {
 
     let state = State::get(lua)?;
     let state = state.borrow::<State>()?;
-    state.as_main().unwrap().root.spawn_tests(&lua_cmd)?;
+    state
+        .as_main()
+        .unwrap()
+        .root
+        .spawn_tests(&lua_cmd, profile)?;
 
     Ok(())
 }

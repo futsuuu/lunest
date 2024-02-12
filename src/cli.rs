@@ -12,16 +12,15 @@ pub struct Args {
 #[derive(clap::Subcommand)]
 pub enum Command {
     Run {
-        #[arg(long, short, num_args = 1.., default_values_t = [
-            String::from(r"{test,spec}/**/*.lua"),
-            String::from(r"*[-_\.]{test,spec}.lua"),
-        ])]
-        pattern: Vec<String>,
-        #[arg(long, default_value = "lua", num_args = 1.., allow_hyphen_values = true)]
-        lua_cmd: Vec<String>,
+        #[arg(default_value = "default")]
+        profile: String,
     },
     #[command(hide = true)]
-    Test { id: Vec<String> },
+    Test {
+        #[arg(long)]
+        profile: String,
+        id: Vec<String>,
+    },
 }
 
 impl Cli {
