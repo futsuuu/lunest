@@ -1,4 +1,6 @@
-use anyhow::{bail, Result};
+use std::path::PathBuf;
+
+use anyhow::{Context, Result};
 use mlua::prelude::*;
 
 use crate::{Node, NodeID, NodeName};
@@ -45,9 +47,12 @@ impl MainState {
     }
 
     pub fn insert_node<N: Into<Node>>(&mut self, node: N) -> Result<()> {
-        self.get_node(&self.current_group.clone())?
-            .as_group_mut()?
-            .insert_node(node.into());
+        let node = node.into();
+        let current_group = &self.current_group.to_string();
+        self.get_node_mut(&self.current_group.clone())
+            .and_then(|node| node.as_group_mut())
+            .with_context(|| format!("{current_group} is not a Group node"))?
+            .insert_node(node);
         Ok(())
     }
 
@@ -59,23 +64,58 @@ impl MainState {
         self.current_group.pop();
     }
 
-    fn get_node(&mut self, id: &NodeID) -> Result<&mut Node> {
+    pub fn is_target(&self, path: &PathBuf) -> bool {
+        let Some(current) = self.current_group.get(0) else {
+            return true;
+        };
+        let current = current.as_path().unwrap();
+        if let (Ok(current), Ok(path)) = (current.canonicalize(), path.canonicalize()) {
+            current == path
+        } else {
+            current == path
+        }
+    }
+
+    pub fn get_node_mut(&mut self, id: &NodeID) -> Option<&mut Node> {
         fn inner<'a>(
             node: &'a mut Node,
             node_id: &'_ NodeID,
             depth: usize,
-        ) -> Result<&'a mut Node> {
+        ) -> Option<&'a mut Node> {
             let Some(child_name) = node_id.get(depth) else {
                 // node_id.len() ≦ depth
-                return Ok(node);
+                return Some(node);
             };
-            let id = node.id().to_string();
-            let Some(child) = node.as_group_mut()?.children.get_mut(&child_name) else {
-                bail!("Failed to get {child_name} from {id}");
+            let Some(group) = node.as_group_mut() else {
+                return None;
+            };
+            let Some(child) = group.children.get_mut(&child_name) else {
+                return None;
             };
             inner(child, node_id, depth + 1)
         }
         inner(&mut self.root, id, 0)
+    }
+
+    #[cfg(feature = "test")]
+    pub fn get_node(&self, id: &NodeID) -> Option<&Node> {
+        fn inner<'a>(
+            node: &'a Node,
+            node_id: &'_ NodeID,
+            depth: usize,
+        ) -> Option<&'a Node> {
+            let Some(child_name) = node_id.get(depth) else {
+                return Some(node);
+            };
+            let Some(group) = node.as_group() else {
+                return None;
+            };
+            let Some(child) = group.children.get(&child_name) else {
+                return None;
+            };
+            inner(child, node_id, depth + 1)
+        }
+        inner(&self.root, id, 0)
     }
 }
 
@@ -93,8 +133,9 @@ impl ChildState {
         }
     }
 
-    pub fn is_target(&self, name: &NodeName) -> bool {
-        &self.target.get(self.depth).unwrap() == name
+    pub fn is_target(&self, path: &PathBuf, name: &NodeName) -> bool {
+        self.target.get(0).unwrap().as_path() == Some(path)
+            && &self.target.get(self.depth).unwrap() == name
     }
 
     pub fn move_to_child(&mut self) -> Option<NodeName> {

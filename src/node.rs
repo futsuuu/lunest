@@ -6,7 +6,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use shared::command_to_string;
 
@@ -14,6 +14,7 @@ pub use id::ID;
 pub use name::Name;
 
 #[derive(Debug)]
+#[cfg_attr(feature = "test", derive(PartialEq))]
 pub enum Node {
     Group(Group),
     Test(Test),
@@ -31,10 +32,18 @@ impl Node {
         }
     }
 
-    pub fn as_group_mut(&mut self) -> Result<&mut Group> {
+    #[cfg(feature = "test")]
+    pub fn as_group(&self) -> Option<&Group> {
         match self {
-            Self::Group(g) => Ok(g),
-            _ => bail!("Cannot use {} as Group", self.id()),
+            Self::Group(g) => Some(g),
+            _ => None,
+        }
+    }
+
+    pub fn as_group_mut(&mut self) -> Option<&mut Group> {
+        match self {
+            Self::Group(g) => Some(g),
+            _ => None,
         }
     }
 
@@ -59,6 +68,7 @@ impl From<Test> for Node {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "test", derive(PartialEq))]
 pub struct Group {
     id: ID,
     pub children: IndexMap<Name, Node>,
@@ -93,7 +103,17 @@ impl Group {
     }
 }
 
+impl From<ID> for Group {
+    fn from(id: ID) -> Self {
+        Self {
+            id,
+            children: IndexMap::new(),
+        }
+    }
+}
+
 #[derive(Debug)]
+#[cfg_attr(feature = "test", derive(PartialEq))]
 pub struct Test {
     id: ID,
 }
@@ -134,5 +154,11 @@ impl Test {
         }
 
         Ok(())
+    }
+}
+
+impl From<ID> for Test {
+    fn from(id: ID) -> Self {
+        Self { id }
     }
 }

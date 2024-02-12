@@ -1,9 +1,14 @@
 mod child;
+mod main;
+
+use std::path::Path;
 
 use macros::lua_module_test;
 use mlua::prelude::*;
 
 use crate::NodeName;
+
+const TESTFILE: &str = "test.lua";
 
 #[lua_module_test(lua_eval)]
 fn hello_world(lua: &Lua) -> LuaResult<()> {
@@ -28,25 +33,29 @@ fn lua_eval(lua_code: &str) -> std::process::Output {
     .expect("failed to execute process")
 }
 
-fn test<'lua, F>(lua: &'lua Lua, name: &'_ str, func: F) -> LuaResult<()>
+fn test<'lua, P, F>(lua: &'lua Lua, path: P, name: &'_ str, func: F) -> LuaResult<()>
 where
+    P: AsRef<Path>,
     F: Fn(&'lua Lua) -> LuaResult<()> + 'static,
 {
     crate::test(
         lua,
+        path.as_ref().to_path_buf(),
         name.to_string(),
         lua.create_function(move |lua, _: ()| func(lua))?,
     )
     .into_lua_err()
 }
 
-fn group<'lua, N, F>(lua: &'lua Lua, name: N, func: F) -> LuaResult<()>
+fn group<'lua, P, N, F>(lua: &'lua Lua, path: P, name: N, func: F) -> LuaResult<()>
 where
+    P: AsRef<Path>,
     N: Into<NodeName>,
     F: Fn(&'lua Lua) -> LuaResult<()> + 'static,
 {
     crate::group(
         lua,
+        path.as_ref().to_path_buf(),
         name.into(),
         lua.create_function(move |lua, _: ()| func(lua))?,
     )

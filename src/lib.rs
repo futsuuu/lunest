@@ -35,17 +35,22 @@ fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
         ),
         (
             "test",
-            lua.create_function(|lua, (name, func)| {
-                test(lua, name, func).into_lua_err()?;
-                Ok(())
-            })?,
+            lua.create_function(
+                |lua, (path, name, func): (String, String, LuaFunction)| {
+                    test(lua, PathBuf::from(path), name, func).into_lua_err()?;
+                    Ok(())
+                },
+            )?,
         ),
         (
             "group",
-            lua.create_function(|lua, (name, func): (String, LuaFunction)| {
-                group(lua, NodeName::from(name), func).into_lua_err()?;
-                Ok(())
-            })?,
+            lua.create_function(
+                |lua, (path, name, func): (String, String, LuaFunction)| {
+                    group(lua, PathBuf::from(path), NodeName::from(name), func)
+                        .into_lua_err()?;
+                    Ok(())
+                },
+            )?,
         ),
     ])
 }
@@ -63,6 +68,7 @@ fn main(lua: &Lua, patterns: &[String], lua_cmd: Vec<String>) -> Result<()> {
     for path in target_files {
         group(
             lua,
+            path.clone(),
             path.strip_prefix(&cwd).unwrap_or(&path).to_path_buf(),
             lua.create_function(move |lua, _: ()| lua.load(path.as_path()).exec())?,
         )?;
@@ -85,16 +91,19 @@ fn child_main(lua: &Lua, test: NodeID) -> Result<()> {
     Ok(())
 }
 
-fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
+fn test(lua: &Lua, path: PathBuf, name: String, func: LuaFunction) -> Result<()> {
     let state = State::get(lua)?;
     let mut state = state.borrow_mut::<State>()?;
     match state.deref_mut() {
         State::Main(ref mut main_state) => {
+            if !main_state.is_target(&path) {
+                return Ok(());
+            }
             let parent_id = main_state.current_group.clone();
             main_state.insert_node(Test::new(parent_id, name)?)?;
         }
         State::Child(child_state) => {
-            if !child_state.is_target(&name.into()) {
+            if !child_state.is_target(&path, &name.into()) {
                 return Ok(());
             }
             if let Err(e) = func.call::<_, ()>(()) {
@@ -107,18 +116,24 @@ fn test(lua: &Lua, name: String, func: LuaFunction) -> Result<()> {
     Ok(())
 }
 
-fn group<N: Into<NodeName>>(lua: &Lua, name: N, func: LuaFunction) -> Result<()> {
+fn group<N>(lua: &Lua, path: PathBuf, name: N, func: LuaFunction) -> Result<()>
+where
+    N: Into<NodeName>,
+{
     let name = name.into();
     let state = State::get(lua)?;
     let mut state = state.borrow_mut::<State>()?;
     match state.deref_mut() {
         State::Main(ref mut main_state) => {
+            if !main_state.is_target(&path) {
+                return Ok(());
+            }
             let parent_id = main_state.current_group.clone();
             main_state.insert_node(Group::new(parent_id, name.clone())?)?;
             main_state.move_to_child(name)?;
         }
         State::Child(ref mut child_state) => {
-            if !child_state.is_target(&name) {
+            if !child_state.is_target(&path, &name) {
                 return Ok(());
             }
             child_state.move_to_child();

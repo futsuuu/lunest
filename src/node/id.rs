@@ -5,7 +5,7 @@ use anyhow::{Context as _, Result};
 use super::Name;
 
 #[derive(Debug, Clone)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "test", derive(PartialEq, Eq))]
 pub struct ID {
     path: Option<PathBuf>,
     names: Vec<String>,
@@ -105,13 +105,23 @@ impl From<Vec<String>> for ID {
     }
 }
 
+impl<'a> From<Vec<&'a str>> for ID {
+    fn from(value: Vec<&'a str>) -> Self {
+        let mut value = value.into_iter();
+        Self {
+            path: value.next().map(PathBuf::from),
+            names: value.map(|s| s.to_string()).collect(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod from_vec {
     use super::*;
 
     #[test]
     fn empty() {
-        let id = ID::from(Vec::new());
+        let id = ID::from(Vec::<&str>::new());
         assert_eq!(
             ID {
                 path: None,
@@ -123,7 +133,7 @@ mod from_vec {
 
     #[test]
     fn only_path() {
-        let id = ID::from(vec!["path".to_string()]);
+        let id = ID::from(vec!["path"]);
         assert_eq!(
             ID {
                 path: Some(PathBuf::from("path")),
@@ -135,11 +145,7 @@ mod from_vec {
 
     #[test]
     fn with_names() {
-        let id = ID::from(vec![
-            "path".to_string(),
-            "first".to_string(),
-            "second".to_string(),
-        ]);
+        let id = ID::from(vec!["path", "first", "second"]);
         assert_eq!(
             ID {
                 path: Some(PathBuf::from("path")),
