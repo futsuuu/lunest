@@ -20,14 +20,19 @@ fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
     lua.create_table_from([
         (
             "main",
-            lua.create_function(|lua, args| {
-                let cli = cli::Cli::new(args);
+            lua.create_function(|lua, lua_args: Vec<String>| {
+                let cli = cli::Cli::new(lua_args.clone());
                 match cli.args.command {
                     cli::Command::Run { profile } => {
                         let config = Config::load(lua, &profile)?;
-                        let mut lua_cmd = config.lua_cmd.clone();
-                        lua_cmd.push(cli.main_file);
-                        main(lua, &profile, &config.pattern, lua_cmd).into_lua_err()?;
+                        let args = env::args().collect::<Vec<String>>();
+                        main(
+                            lua,
+                            &profile,
+                            &config.pattern,
+                            get_lua_cmd(&args, &lua_args),
+                        )
+                        .into_lua_err()?;
                     }
                     cli::Command::Test { id, profile } => {
                         Config::load(lua, &profile)?;
@@ -63,7 +68,7 @@ fn main(
     lua: &Lua,
     profile: &str,
     patterns: &[String],
-    lua_cmd: Vec<String>,
+    lua_cmd: &[String],
 ) -> Result<()> {
     let cwd = env::current_dir()?;
     let target_files = GlobWalkerBuilder::from_patterns(&cwd, patterns)
@@ -89,7 +94,7 @@ fn main(
         .as_main()
         .unwrap()
         .root
-        .spawn_tests(&lua_cmd, profile)?;
+        .spawn_tests(lua_cmd, profile)?;
 
     Ok(())
 }
@@ -164,4 +169,31 @@ where
     }
 
     Ok(())
+}
+
+fn get_lua_cmd<'a>(args: &'a [String], lua_args: &'a [String]) -> &'a [String] {
+    &args[..args.len() - lua_args.len() + 1]
+}
+
+#[test]
+fn test_get_lua_cmd() {
+    assert_eq!(
+        &["lua".to_string(), "file.lua".to_string()],
+        get_lua_cmd(
+            &["lua".to_string(), "file.lua".to_string()],
+            &["file.lua".to_string()]
+        )
+    );
+    assert_eq!(
+        &["nvim".to_string(), "-l".to_string(), "file.lua".to_string()],
+        get_lua_cmd(
+            &[
+                "nvim".to_string(),
+                "-l".to_string(),
+                "file.lua".to_string(),
+                "run".to_string()
+            ],
+            &["file.lua".to_string(), "run".to_string()]
+        )
+    );
 }

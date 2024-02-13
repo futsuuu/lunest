@@ -3,7 +3,6 @@ use std::env::current_dir;
 use mlua::prelude::*;
 
 pub struct Config {
-    pub lua_cmd: Vec<String>,
     pub pattern: Vec<String>,
 }
 
@@ -22,11 +21,10 @@ impl FromLua<'_> for Config {
     fn from_lua(value: LuaValue<'_>, lua: &Lua) -> LuaResult<Self> {
         let table = LuaTable::from_lua(value, lua)?;
         Ok(Self {
-            lua_cmd: table.get("lua_cmd").unwrap_or(vec![
+            pattern: table.get("pattern").unwrap_or(vec![
                 String::from(r"{test,spec}/**/*.lua"),
                 String::from(r"*[-_\.]{test,spec}.lua"),
             ]),
-            pattern: table.get("pattern").unwrap_or(vec![String::from("lua")]),
         })
     }
 }
