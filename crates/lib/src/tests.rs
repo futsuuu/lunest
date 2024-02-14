@@ -3,7 +3,7 @@ mod main;
 
 use std::path::Path;
 
-use macros::lua_module_test;
+use lunest_macros::lua_module_test;
 use mlua::prelude::*;
 
 use crate::NodeName;
@@ -12,7 +12,7 @@ const TESTFILE: &str = "test.lua";
 
 #[lua_module_test(lua_eval)]
 fn hello_world(lua: &Lua) -> LuaResult<()> {
-    let lunest = super::lunest(lua)?;
+    let lunest = super::lunest_lib(lua)?;
     lua.load(mlua::chunk! {
         local lunest = $lunest
         assert(type(lunest) == "table")
@@ -24,13 +24,13 @@ fn hello_world(lua: &Lua) -> LuaResult<()> {
 
 #[cfg(test)]
 fn lua_eval(lua_code: &str) -> std::process::Output {
-    std::process::Command::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/target/debug/lua_rt" // "lua_rt" package was already built by xtask
-    ))
-    .arg(lua_code)
-    .output()
-    .expect("failed to execute process")
+    let root = project_root::get_project_root().unwrap();
+    // "lua_rt" package was already built by xtask
+    let mut cmd = std::process::Command::new(root.join("target/debug/lua_rt"));
+    cmd.arg(lua_code)
+        .current_dir(root)
+        .output()
+        .expect("failed to execute process")
 }
 
 fn test<'lua, P, F>(lua: &'lua Lua, path: P, name: &'_ str, func: F) -> LuaResult<()>

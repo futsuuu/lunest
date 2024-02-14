@@ -7,7 +7,7 @@ do
     .. 'lunest_lib'
     .. (package.path:sub(1, 1) == '/' and '.so' or '.dll')
 
-  local loader = assert(package.loadlib(dll, 'luaopen_lunest'))
+  local loader = assert(package.loadlib(dll, 'luaopen_lunest_lib'))
   package.loaded[lib_modname] = loader()
 end
 

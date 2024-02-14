@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::Command};
 
 pub fn dll_path() -> PathBuf {
-    let path = env::current_dir().unwrap().join("lua");
+    let path = project_root::get_project_root().unwrap().join("lua");
     #[cfg(windows)]
     return path.join("lunest_lib.dll");
     #[cfg(not(windows))]

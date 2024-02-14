@@ -1,6 +1,6 @@
 [workspace]
+resolver = "2"
 members = [
-  ".",
   "crates/*",
 ]
 
@@ -9,39 +9,12 @@ version = "0.0.0"
 edition = "2021"
 
 [workspace.dependencies]
-macros = { path = "crates/macros" }
-shared = { path = "crates/shared" }
+lunest_macros = { path = "crates/macros" }
+lunest_shared = { path = "crates/shared" }
 mlua = "0.9.5"
 anyhow = "1.0.79"
 clap = { version = "4.4.18", features = ["derive"] }
-
-[package]
-name = "lunest"
-version.workspace = true
-edition.workspace = true
-
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-shared = { workspace = true }
-macros = { workspace = true }
-anyhow = { workspace = true }
-mlua = { workspace = true, features = ["module"] }
-clap = { workspace = true }
-globwalk = "0.9.1"
-indexmap = "2.2.1"
-scopeguard = { version = "1.2.0", optional = true }  # used in `macros` crate
-
-[features]
-default = ["test", "lua54"]
-test = ["macros/test", "dep:scopeguard", "mlua/macros"]
-lua51 = ["mlua/lua51"]
-lua52 = ["mlua/lua52"]
-lua53 = ["mlua/lua53"]
-lua54 = ["mlua/lua54"]
-luajit = ["mlua/luajit"]
-luajit52 = ["mlua/luajit52"]
+project-root = "0.2.2"
 
 [profile.release]
 opt-level = "z"

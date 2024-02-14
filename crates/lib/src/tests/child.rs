@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use macros::lua_module_test;
+use lunest_macros::lua_module_test;
 use mlua::prelude::*;
 
 #[cfg(test)]

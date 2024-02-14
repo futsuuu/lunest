@@ -1,6 +1,7 @@
 [package]
-name = "shared"
+name = "lunest_shared"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
+project-root.workspace = true

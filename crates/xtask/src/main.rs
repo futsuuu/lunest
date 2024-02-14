@@ -43,7 +43,13 @@ impl Args {
 
     fn build(&self, test: bool) -> Result<()> {
         let mut cmd = Command::new(env!("CARGO"));
-        cmd.args(["build", "--message-format", "json-render-diagnostics"]);
+        cmd.args([
+            "build",
+            "--package",
+            "lunest_lib",
+            "--message-format",
+            "json-render-diagnostics",
+        ]);
         #[cfg(not(debug_assertions))]
         cmd.arg("--release");
         set_features(&mut cmd, test);
@@ -59,7 +65,7 @@ impl Args {
             let Ok(artifact) = get_artifact(&buffer) else {
                 continue;
             };
-            fs::copy(artifact, shared::dll_path())?;
+            fs::copy(artifact, lunest_shared::dll_path())?;
         }
         let status = child.wait()?;
         if !status.success() {
@@ -93,7 +99,7 @@ fn set_features(cmd: &mut Command, test: bool) {
     cmd.args([
         "--no-default-features",
         "--features",
-        macros::lua_feature!(),
+        lunest_macros::lua_feature!(),
     ]);
     if test {
         cmd.args(["--features", "test"]);
@@ -105,7 +111,7 @@ fn get_artifact(json: &str) -> Result<PathBuf> {
     let Some(filenames) = json.get("filenames") else {
         bail!("'filenames' field not found");
     };
-    let lib_name = format!("{DLL_PREFIX}lunest{DLL_SUFFIX}");
+    let lib_name = format!("{DLL_PREFIX}lunest_lib{DLL_SUFFIX}");
     let filenames: Vec<String> = serde_json::from_value(filenames.clone())?;
     for filename in filenames {
         let path = PathBuf::from(filename);
@@ -117,5 +123,5 @@ fn get_artifact(json: &str) -> Result<PathBuf> {
 }
 
 fn sep(cmd: &Command) {
-    println!("\n──────────── {}", shared::command_to_string(cmd));
+    println!("\n──────────── {}", lunest_shared::command_to_string(cmd));
 }

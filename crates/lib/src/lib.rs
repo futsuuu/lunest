@@ -16,7 +16,7 @@ use node::{Group, Name as NodeName, Node, Test, ID as NodeID};
 use state::{ChildState, MainState, State};
 
 #[mlua::lua_module]
-fn lunest(lua: &Lua) -> LuaResult<LuaTable> {
+fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
     lua.create_table_from([
         (
             "main",

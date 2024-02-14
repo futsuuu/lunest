@@ -5,8 +5,8 @@ edition.workspace = true
 default-run = "xtask"
 
 [dependencies]
-macros.workspace = true
-shared.workspace = true
+lunest_macros.workspace = true
+lunest_shared.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde_json = "1.0"

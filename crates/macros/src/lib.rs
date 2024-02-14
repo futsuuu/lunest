@@ -49,7 +49,7 @@ pub fn lua_module_test(attr: TokenStream, item: TokenStream) -> TokenStream {
     let lua_ident = Ident::new(&format!("{ident}{hash}"), Span::call_site());
 
     let lua_code = {
-        let dll = shared::dll_path()
+        let dll = lunest_shared::dll_path()
             .to_string_lossy()
             .to_string()
             .replace('\\', "/");
