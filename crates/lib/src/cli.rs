@@ -1,6 +1,10 @@
+use std::env;
+
+use mlua::prelude::*;
+
 pub struct Cli {
-    pub main_file: String,
     pub args: Args,
+    pub lua_cmd: Vec<String>,
 }
 
 #[derive(clap::Parser)]
@@ -24,11 +28,24 @@ pub enum Command {
 }
 
 impl Cli {
-    pub fn new(args: Vec<String>) -> Self {
+    pub fn new(lua: &Lua) -> LuaResult<Self> {
         use clap::Parser;
-        Self {
-            main_file: args[0].clone(),
-            args: Args::parse_from(&args),
-        }
+
+        // ['lua', 'file.lua', 'arg1', 'arg2']
+        let args = env::args().collect::<Vec<String>>();
+        // ['arg1', 'arg2']
+        let lua_args = lua.globals().get::<_, Vec<String>>("arg")?;
+        // ['lua', 'file.lua']
+        let lua_cmd = args[..args.len() - lua_args.len()].to_vec();
+        // ['file.lua', 'arg1', 'arg2']
+        let args = {
+            let mut args = lua_args.clone();
+            args.insert(0, lua_cmd.last().unwrap().clone());
+            args
+        };
+        Ok(Self {
+            args: Args::parse_from(args),
+            lua_cmd,
+        })
     }
 }

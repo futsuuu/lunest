@@ -35,4 +35,4 @@ end
 
 package.loaded.lunest = M
 
-lib.main({ arg[0], (unpack or table.unpack)(arg) })
+lib.main()
