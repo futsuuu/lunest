@@ -42,3 +42,7 @@ lua53 = ["mlua/lua53"]
 lua54 = ["mlua/lua54"]
 luajit = ["mlua/luajit"]
 luajit52 = ["mlua/luajit52"]
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1

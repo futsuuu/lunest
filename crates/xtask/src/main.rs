@@ -44,6 +44,8 @@ impl Args {
     fn build(&self, test: bool) -> Result<()> {
         let mut cmd = Command::new(env!("CARGO"));
         cmd.args(["build", "--message-format", "json-render-diagnostics"]);
+        #[cfg(not(debug_assertions))]
+        cmd.arg("--release");
         set_features(&mut cmd, test);
         sep(&cmd);
 
