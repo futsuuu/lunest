@@ -5,17 +5,7 @@ edition.workspace = true
 default-run = "xtask"
 
 [dependencies]
-lunest_macros.workspace = true
 lunest_shared.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde_json = "1.0"
-
-[features]
-default = ["lua54"]
-lua51 = []
-lua52 = []
-lua53 = []
-lua54 = []
-luajit = []
-luajit52 = []

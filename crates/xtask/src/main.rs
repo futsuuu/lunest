@@ -24,35 +24,54 @@ struct Args {
 
 #[derive(clap::Subcommand)]
 enum Subcommand {
-    Build,
-    Test,
+    Build {
+        #[arg(long, num_args = 1.., required = true)]
+        lua_features: Vec<String>,
+    },
+    Test {
+        #[arg(long, num_args = 1.., required = true)]
+        lua_features: Vec<String>,
+    },
 }
 
 impl Args {
     fn main(&self) -> Result<()> {
         match &self.command {
-            Subcommand::Build => {
-                self.build(false)?;
+            Subcommand::Build { lua_features } => {
+                self.build(lua_features)?;
             }
-            Subcommand::Test => {
-                self.test()?;
+            Subcommand::Test { lua_features } => {
+                for feature in lua_features {
+                    self.test(feature)?;
+                }
             }
         }
         Ok(())
     }
 
-    fn build(&self, test: bool) -> Result<()> {
+    fn build(&self, lua_features: &[String]) -> Result<()> {
+        for feature in lua_features {
+            self.build_lib(false, feature)?;
+        }
         let mut cmd = Command::new(env!("CARGO"));
-        cmd.args([
-            "build",
-            "--package",
-            "lunest_lib",
-            "--message-format",
-            "json-render-diagnostics",
-        ]);
+        cmd.arg("build").args(["--package", "lunest"]);
         #[cfg(not(debug_assertions))]
         cmd.arg("--release");
-        set_features(&mut cmd, test);
+        sep(&cmd);
+        if !cmd.status()?.success() {
+            bail!("build failed");
+        }
+        Ok(())
+    }
+
+    fn build_lib(&self, test: bool, lua_feature: &str) -> Result<()> {
+        let mut cmd = Command::new(env!("CARGO"));
+        cmd.arg("build")
+            .args(["--package", "lunest_lib"])
+            .args(["--message-format", "json-render-diagnostics"]);
+        #[cfg(not(debug_assertions))]
+        cmd.arg("--release");
+        set_features(&mut cmd, test, lua_feature);
         sep(&cmd);
 
         let mut child = cmd.stdout(Stdio::piped()).spawn()?;
@@ -65,22 +84,23 @@ impl Args {
             let Ok(artifact) = get_artifact(&buffer) else {
                 continue;
             };
-            fs::copy(artifact, lunest_shared::dll_path())?;
+            fs::copy(artifact, lunest_shared::dll_path(lua_feature))?;
         }
-        let status = child.wait()?;
-        if !status.success() {
+        if !child.wait()?.success() {
             bail!("build failed");
         }
 
         Ok(())
     }
 
-    fn test(&self) -> Result<()> {
-        self.build(true)?;
+    fn test(&self, lua_feature: &str) -> Result<()> {
+        self.build_lib(true, lua_feature)?;
 
         let mut cmd = Command::new(env!("CARGO"));
-        cmd.args(["build", "--package", "lua_rt", "--features", "vendored"]);
-        set_features(&mut cmd, false);
+        cmd.arg("build")
+            .args(["--package", "lua_rt"])
+            .args(["--features", "vendored"]);
+        set_features(&mut cmd, false, lua_feature);
         sep(&cmd);
         if !cmd.status()?.success() {
             bail!("build failed");
@@ -88,19 +108,15 @@ impl Args {
 
         let mut cmd = Command::new(env!("CARGO"));
         cmd.arg("test");
-        set_features(&mut cmd, true);
+        set_features(&mut cmd, true, lua_feature);
         sep(&cmd);
         cmd.status()?;
         Ok(())
     }
 }
 
-fn set_features(cmd: &mut Command, test: bool) {
-    cmd.args([
-        "--no-default-features",
-        "--features",
-        lunest_macros::lua_feature!(),
-    ]);
+fn set_features(cmd: &mut Command, test: bool, lua_feature: &str) {
+    cmd.args(["--no-default-features", "--features", lua_feature]);
     if test {
         cmd.args(["--features", "test"]);
     }

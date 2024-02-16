@@ -48,14 +48,6 @@ pub fn lua_module_test(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
     let lua_ident = Ident::new(&format!("{ident}{hash}"), Span::call_site());
 
-    let lua_code = {
-        let dll = lunest_shared::dll_path()
-            .to_string_lossy()
-            .to_string()
-            .replace('\\', "/");
-        format!("assert(package.loadlib('{dll}', 'luaopen_{lua_ident}'))()")
-    };
-
     let generated = quote! {
         #[::mlua::lua_module]
         fn #lua_ident #generics (#inputs) -> ::mlua::Result<::mlua::Value> {
@@ -72,7 +64,15 @@ pub fn lua_module_test(attr: TokenStream, item: TokenStream) -> TokenStream {
         fn #ident() {
             use ::std::string::String;
 
-            let out = #spawner(#lua_code);
+            let lua_code = {
+                let dll = lunest_shared::dll_path(lunest_macros::lua_feature!())
+                    .to_string_lossy()
+                    .to_string()
+                    .replace('\\', "/");
+                format!("assert(package.loadlib('{dll}', 'luaopen_{}'))()", stringify!(#lua_ident))
+            };
+
+            let out = #spawner(lua_code);
 
             if !out.stdout.is_empty() {
                 println!("```stdout\n{}\n```", String::from_utf8_lossy(&out.stdout));

@@ -1,17 +1,28 @@
-assert(arg[0])
+local MODNAME = 'lunest'
 
-local lib_modname = 'lunest.lib'
-assert(not package.loaded[lib_modname])
-do
-  local dll = (debug.getinfo(1, 'S').source:match('@(.+[/\\])') or '')
-    .. 'lunest_lib'
-    .. (package.path:sub(1, 1) == '/' and '.so' or '.dll')
-
-  local loader = assert(package.loadlib(dll, 'luaopen_lunest_lib'))
-  package.loaded[lib_modname] = loader()
+if package.loaded[MODNAME] then
+  return
 end
 
-local lib = require(lib_modname)
+---@return string
+local function lua_id()
+  local str = ''
+  for c in _VERSION:gmatch('%d+') do
+    str = str .. c
+  end
+  return str
+end
+
+local function load_dll()
+  local dll = (debug.getinfo(1, 'S').source:match('@(.+[/\\])') or '')
+    .. 'lunest_lib.'
+    .. lua_id()
+    .. (package.path:sub(1, 1) == '/' and '.so' or '.dll')
+  local loader = assert(package.loadlib(dll, 'luaopen_lunest_lib'))
+  return loader()
+end
+
+local lib = load_dll()
 
 local M = {}
 
@@ -33,6 +44,6 @@ function M.group(name, func)
   lib.group(where_called(), name, func)
 end
 
-package.loaded.lunest = M
+package.loaded[MODNAME] = M
 
 lib.main()

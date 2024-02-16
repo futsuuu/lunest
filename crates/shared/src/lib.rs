@@ -1,11 +1,14 @@
 use std::{env, path::PathBuf, process::Command};
 
-pub fn dll_path() -> PathBuf {
-    let path = project_root::get_project_root().unwrap().join("lua");
-    #[cfg(windows)]
-    return path.join("lunest_lib.dll");
+pub fn dll_path(lua_feature: &str) -> PathBuf {
+    let lua_id = lua_feature.strip_prefix("lua").unwrap();
     #[cfg(not(windows))]
-    return path.join("lunest_lib.so");
+    let ext = "so";
+    #[cfg(windows)]
+    let ext = "dll";
+    project_root::get_project_root()
+        .unwrap()
+        .join(&format!("lua/lunest_lib.{lua_id}.{ext}"))
 }
 
 pub fn command_to_string(cmd: &Command) -> String {
