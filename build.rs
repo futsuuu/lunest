@@ -19,6 +19,12 @@ fn main() -> anyhow::Result<()> {
     };
     let mut zip = zip::ZipWriter::new(zip);
     let file_opts = zip::write::FileOptions::default();
+    #[cfg(debug_assertions)]
+    let file_opts = file_opts.compression_method(zip::CompressionMethod::Stored);
+    #[cfg(not(debug_assertions))]
+    let file_opts = file_opts
+        .compression_method(zip::CompressionMethod::Zstd)
+        .compression_level(Some(22)); // max level
 
     for entry in fs::read_dir("lua")?.filter_map(Result::ok) {
         let path = entry.path();

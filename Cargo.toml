@@ -16,11 +16,16 @@ mlua = "0.9.5"
 anyhow = "1.0.79"
 clap = { version = "4.4.18", features = ["derive"] }
 project-root = "0.2.2"
-zip = "0.6.6"
+zip = { version = "0.6.6", default-features = false, features = ["zstd"] }
 
 [profile.release]
+lto = true
+strip = true
 opt-level = "z"
 codegen-units = 1
+
+[profile.release.package.lunest_lib]
+strip = false
 
 [package]
 name = "lunest"
