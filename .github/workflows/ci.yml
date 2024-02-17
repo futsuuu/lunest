@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup cache for Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Download DLL
+        if: matrix.os == 'windows-latest'
+        run: powershell -NoProfile -ExecutionPolicy Unrestricted ./scripts/get_lua_dll.ps1
+
+      - name: Test
+        run: cargo xtask test --lua-features lua51 lua52 lua53 lua54
