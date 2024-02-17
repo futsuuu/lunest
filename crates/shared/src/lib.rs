@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod config;
 
 use std::{env, path::PathBuf, process::Command};

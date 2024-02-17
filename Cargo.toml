@@ -35,7 +35,6 @@ edition.workspace = true
 [dependencies]
 lunest_shared.workspace = true
 anyhow.workspace = true
-clap.workspace = true
 zip.workspace = true
 dirs = "5.0.1"
 

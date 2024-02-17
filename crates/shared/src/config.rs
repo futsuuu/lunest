@@ -10,6 +10,8 @@ pub struct Config {
 
 #[derive(Deserialize, Clone)]
 pub struct Profile {
+    #[serde(skip)]
+    name: String,
     lua: Option<Vec<String>>,
     setup: Option<String>,
     files: Option<Vec<String>>,
@@ -17,6 +19,7 @@ pub struct Profile {
 
 impl Config {
     pub fn get_profile(profile: &str) -> Result<Profile> {
+        let profile_str = profile;
         let file_path = current_dir()?.join(".lunest").join("config.toml");
         let config: Config = toml::from_str(&fs::read_to_string(file_path)?)?;
 
@@ -26,6 +29,7 @@ impl Config {
             .get(profile)
             .with_context(|| format!("cannot get profile '{profile}'"))?;
         Ok(Profile {
+            name: profile_str.to_string(),
             lua: or(&profile.lua, &default.lua),
             setup: or(&profile.setup, &default.setup),
             files: or(&profile.files, &default.files),
@@ -38,6 +42,9 @@ fn or<T: Clone>(a: &Option<T>, b: &Option<T>) -> Option<T> {
 }
 
 impl Profile {
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
     pub fn get_lua(&self) -> Result<&Vec<String>> {
         self.lua.as_ref().context("field 'lua' not specified")
     }
@@ -57,6 +64,7 @@ impl Profile {
 impl Default for Profile {
     fn default() -> Profile {
         Profile {
+            name: String::new(), // this value is not used
             lua: Some(vec![String::from("lua")]),
             setup: None,
             files: Some(vec![String::from(r"**/*[\._]{test,spec}.lua")]),
