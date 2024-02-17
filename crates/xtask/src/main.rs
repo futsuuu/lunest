@@ -20,38 +20,45 @@ fn main() -> Result<()> {
 struct Args {
     #[command(subcommand)]
     command: Subcommand,
+    #[arg(long, short, global = true, default_values_t = [
+        String::from("lua51"),
+        String::from("lua52"),
+        String::from("lua53"),
+        String::from("lua54"),
+    ])]
+    lua_features: Vec<String>,
 }
 
 #[derive(clap::Subcommand)]
 enum Subcommand {
-    Build {
-        #[arg(long, num_args = 1.., required = true)]
-        lua_features: Vec<String>,
-    },
-    Test {
-        #[arg(long, num_args = 1.., required = true)]
-        lua_features: Vec<String>,
-    },
+    Build,
+    Test,
+    Install,
 }
 
 impl Args {
     fn main(&self) -> Result<()> {
         match &self.command {
-            Subcommand::Build { lua_features } => {
-                self.build(lua_features)?;
+            Subcommand::Build => {
+                self.build(&self.lua_features, false)?;
             }
-            Subcommand::Test { lua_features } => {
-                for feature in lua_features {
-                    self.test(feature)?;
-                }
+            Subcommand::Test => {
+                self.test(&self.lua_features)?;
+            }
+            Subcommand::Install => {
+                self.build(&self.lua_features, true)?;
+                self.install()?;
             }
         }
         Ok(())
     }
 
-    fn build(&self, lua_features: &[String]) -> Result<()> {
+    fn build(&self, lua_features: &[String], lib_only: bool) -> Result<()> {
         for feature in lua_features {
             self.build_lib(false, feature)?;
+        }
+        if lib_only {
+            return Ok(());
         }
         let mut cmd = Command::new(env!("CARGO"));
         cmd.arg("build").args(["--package", "lunest"]);
@@ -93,7 +100,22 @@ impl Args {
         Ok(())
     }
 
-    fn test(&self, lua_feature: &str) -> Result<()> {
+    fn test(&self, lua_features: &[String]) -> Result<()> {
+        let mut cmd = Command::new(env!("CARGO"));
+        cmd.arg("test").args(["--package", "lunest_shared"]);
+        sep(&cmd);
+        if !cmd.status()?.success() {
+            bail!("test failed")
+        }
+
+        for feature in lua_features {
+            self.test_lib(feature)?;
+        }
+
+        Ok(())
+    }
+
+    fn test_lib(&self, lua_feature: &str) -> Result<()> {
         self.build_lib(true, lua_feature)?;
 
         let mut cmd = Command::new(env!("CARGO"));
@@ -110,7 +132,21 @@ impl Args {
         cmd.arg("test").args(["--package", "lunest_lib"]);
         set_features(&mut cmd, true, lua_feature);
         sep(&cmd);
-        cmd.status()?;
+        if !cmd.status()?.success() {
+            bail!("test failed")
+        }
+        Ok(())
+    }
+
+    fn install(&self) -> Result<()> {
+        let mut cmd = Command::new(env!("CARGO"));
+        cmd.arg("install").args(["--path", "."]);
+        #[cfg(debug_assertions)]
+        cmd.arg("--debug");
+        sep(&cmd);
+        if !cmd.status()?.success() {
+            bail!("install failed")
+        }
         Ok(())
     }
 }
