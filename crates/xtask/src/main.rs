@@ -107,7 +107,7 @@ impl Args {
         }
 
         let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("test");
+        cmd.arg("test").args(["--package", "lunest_lib"]);
         set_features(&mut cmd, true, lua_feature);
         sep(&cmd);
         cmd.status()?;
