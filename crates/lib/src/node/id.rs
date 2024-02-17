@@ -37,6 +37,10 @@ impl ID {
         self.get(0).is_none()
     }
 
+    pub fn get_path(&self) -> Option<&PathBuf> {
+        self.path.as_ref()
+    }
+
     pub fn push(&mut self, item: &Name) -> Result<()> {
         let context = "ID must start with a path and be followed by a string";
         if self.path.is_none() {

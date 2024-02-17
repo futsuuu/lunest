@@ -1,3 +1,5 @@
+pub mod config;
+
 use std::{env, path::PathBuf, process::Command};
 
 pub fn dll_path(lua_feature: &str) -> PathBuf {
@@ -8,7 +10,7 @@ pub fn dll_path(lua_feature: &str) -> PathBuf {
     let ext = "dll";
     project_root::get_project_root()
         .unwrap()
-        .join(&format!("lua/lunest_lib.{lua_id}.{ext}"))
+        .join(format!("lua/lunest_lib.{lua_id}.{ext}"))
 }
 
 pub fn command_to_string(cmd: &Command) -> String {

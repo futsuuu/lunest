@@ -7,15 +7,18 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use clap::Parser as _;
+use lunest_shared::config::Config;
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    let profile = Config::get_profile(&args.profile)?;
     let data_dir = dirs::data_dir()
         .context("cannot get the data directory")?
         .join("lunest");
     extract_archive_if_needed(&data_dir)?;
-    let status = Command::new(&args.lua_cmd[0])
-        .args(&args.lua_cmd[1..])
+    let lua_cmd = profile.get_lua()?;
+    let status = Command::new(&lua_cmd[0])
+        .args(&lua_cmd[1..])
         .arg(data_dir.join("lunest.lua"))
         .arg("run")
         .status()?;
@@ -24,8 +27,7 @@ fn main() -> Result<()> {
 
 #[derive(clap::Parser)]
 struct Args {
-    #[arg(num_args = 1.., required = true, allow_hyphen_values = true)]
-    lua_cmd: Vec<String>,
+    profile: String,
 }
 
 fn extract_archive_if_needed(data_dir: &Path) -> Result<()> {

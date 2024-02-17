@@ -28,6 +28,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+lunest_shared.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 zip.workspace = true
