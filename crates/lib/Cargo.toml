@@ -12,7 +12,7 @@ lunest_macros = { workspace = true }
 anyhow = { workspace = true }
 mlua = { workspace = true, features = ["module"] }
 globwalk = "0.9.1"
-indexmap = "2.2.1"
+indexmap = "2.2.3"
 scopeguard = { version = "1.2.0", optional = true }  # used in `lunest_macros` crate
 project-root = { workspace = true, optional = true }
 
