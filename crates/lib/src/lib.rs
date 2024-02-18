@@ -22,16 +22,7 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
         (
             "main",
             lua.create_function(|lua, _: ()| {
-                let args = cli::Args::parse_from(lua_args(lua)?);
-                let profile = Config::get_profile(&args.profile).into_lua_err()?;
-                match args.command {
-                    cli::Command::Run => {
-                        main(lua, profile).into_lua_err()?;
-                    }
-                    cli::Command::Test { id } => {
-                        child_main(lua, profile, NodeID::from(id)).into_lua_err()?;
-                    }
-                }
+                main(lua).into_lua_err()?;
                 Ok(())
             })?,
         ),
@@ -57,16 +48,26 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
     ])
 }
 
-fn main(lua: &Lua, profile: Profile) -> Result<()> {
+fn main(lua: &Lua) -> Result<()> {
+    let args = cli::Args::parse_from(lua_args(lua)?);
+    let profile = Config::load()?.get_profile(&args.profile)?;
+    match args.command {
+        cli::Command::Run => (),
+        cli::Command::Test { id } => {
+            return child_main(lua, profile, NodeID::from(id));
+        }
+    }
     let cwd = env::current_dir()?;
-    let target_files = GlobWalkerBuilder::from_patterns(&cwd, profile.get_files()?)
+    let target_files = GlobWalkerBuilder::from_patterns(&cwd, profile.get_files())
         .file_type(globwalk::FileType::FILE)
         .build()?
         .filter_map(Result::ok)
         .map(|e| e.path().to_path_buf())
         .collect::<Vec<PathBuf>>();
 
-    lua.load(profile.get_setup()?).exec()?;
+    if let Some(setup) = profile.get_setup() {
+        lua.load(setup).exec()?;
+    }
     State::Main(MainState::new()).set(lua)?;
     for path in target_files {
         group(
@@ -77,7 +78,7 @@ fn main(lua: &Lua, profile: Profile) -> Result<()> {
         )?;
     }
 
-    let mut lua_cmd = profile.get_lua()?.clone();
+    let mut lua_cmd = profile.get_lua().clone();
     let main_file = lua.globals().get::<_, LuaTable>("arg")?.get(0)?;
     lua_cmd.push(main_file);
 
@@ -97,8 +98,10 @@ fn child_main(lua: &Lua, profile: Profile, test: NodeID) -> Result<()> {
     let target_file = child_state.move_to_child().unwrap();
     let target_file = target_file.as_path().unwrap().to_path_buf();
 
+    if let Some(setup) = profile.get_setup() {
+        lua.load(setup).exec()?;
+    }
     State::Child(child_state).set(lua)?;
-    lua.load(profile.get_setup()?).exec()?;
     lua.load(target_file).exec()?;
     Ok(())
 }

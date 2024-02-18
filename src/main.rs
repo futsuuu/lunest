@@ -13,12 +13,12 @@ use lunest_shared::{
 
 fn main() -> Result<()> {
     let args = cli::Args::parse();
-    let profile = Config::get_profile(&args.profile)?;
+    let profile = Config::load()?.get_profile(&args.profile)?;
     let data_dir = dirs::data_dir()
         .context("cannot get the data directory")?
         .join("lunest");
     extract_archive_if_needed(&data_dir)?;
-    let lua_cmd = profile.get_lua()?;
+    let lua_cmd = profile.get_lua();
     let status = Command::new(&lua_cmd[0])
         .args(&lua_cmd[1..])
         .arg(data_dir.join("lunest.lua"))

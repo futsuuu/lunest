@@ -8,6 +8,7 @@ anyhow.workspace = true
 project-root = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 serde = { version = "1.0.196", features = ["derive"], optional = true }
+merge = { version = "0.1.0", default-features = false, features = ["derive"], optional = true }
 
 [dependencies.toml]
 version = "0.8.10"
@@ -16,6 +17,6 @@ features = ["parse"]
 optional = true
 
 [features]
-config = ["dep:serde", "dep:toml"]
+config = ["dep:serde", "dep:toml", "dep:merge"]
 cli = ["dep:clap"]
 utils = ["dep:project-root"]
