@@ -91,7 +91,7 @@ impl Args {
             let Ok(artifact) = get_artifact(&buffer) else {
                 continue;
             };
-            fs::copy(artifact, lunest_shared::dll_path(lua_feature))?;
+            fs::copy(artifact, lunest_shared::utils::dll_path(lua_feature))?;
         }
         if !child.wait()?.success() {
             bail!("build failed");
@@ -102,7 +102,9 @@ impl Args {
 
     fn test(&self, lua_features: &[String]) -> Result<()> {
         let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("test").args(["--package", "lunest_shared"]);
+        cmd.arg("test")
+            .args(["--package", "lunest_shared"])
+            .arg("--all-features");
         sep(&cmd);
         if !cmd.status()?.success() {
             bail!("test failed")
@@ -175,5 +177,8 @@ fn get_artifact(json: &str) -> Result<PathBuf> {
 }
 
 fn sep(cmd: &Command) {
-    println!("\n──────────── {}", lunest_shared::command_to_string(cmd));
+    println!(
+        "\n──────────── {}",
+        lunest_shared::utils::command_to_string(cmd)
+    );
 }

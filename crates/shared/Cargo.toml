@@ -4,8 +4,18 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-project-root.workspace = true
 anyhow.workspace = true
-clap.workspace = true
-serde = { version = "1.0.196", features = ["derive"] }
-toml = { version = "0.8.10", default-features = false, features = ["parse"] }
+project-root = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+serde = { version = "1.0.196", features = ["derive"], optional = true }
+
+[dependencies.toml]
+version = "0.8.10"
+default-features = false
+features = ["parse"]
+optional = true
+
+[features]
+config = ["dep:serde", "dep:toml"]
+cli = ["dep:clap"]
+utils = ["dep:project-root"]

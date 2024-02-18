@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use indexmap::IndexMap;
-use lunest_shared::command_to_string;
+use lunest_shared::utils::command_to_string;
 
 pub use id::ID;
 pub use name::Name;

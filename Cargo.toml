@@ -33,7 +33,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-lunest_shared.workspace = true
+lunest_shared = { workspace = true, features = ["cli", "config"] }
 anyhow.workspace = true
 zip.workspace = true
 dirs = "5.0.1"

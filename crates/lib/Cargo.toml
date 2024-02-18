@@ -7,7 +7,7 @@ edition.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-lunest_shared = { workspace = true }
+lunest_shared = { workspace = true, features = ["utils", "cli", "config"] }
 lunest_macros = { workspace = true }
 anyhow = { workspace = true }
 mlua = { workspace = true, features = ["module"] }

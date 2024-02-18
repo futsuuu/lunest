@@ -65,7 +65,7 @@ pub fn lua_module_test(attr: TokenStream, item: TokenStream) -> TokenStream {
             use ::std::string::String;
 
             let lua_code = {
-                let dll = lunest_shared::dll_path(lunest_macros::lua_feature!())
+                let dll = lunest_shared::utils::dll_path(lunest_macros::lua_feature!())
                     .to_string_lossy()
                     .to_string()
                     .replace('\\', "/");
