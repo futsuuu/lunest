@@ -25,7 +25,7 @@ struct Args {
         String::from("lua52"),
         String::from("lua53"),
         String::from("lua54"),
-    ])]
+    ], num_args = 1..)]
     lua_features: Vec<String>,
 }
 
