@@ -7,7 +7,7 @@ edition.workspace = true
 anyhow.workspace = true
 project-root = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
-serde = { version = "1.0.196", features = ["derive"], optional = true }
+serde = { version = "1.0.197", features = ["derive"], optional = true }
 merge = { version = "0.1.0", default-features = false, features = ["derive"], optional = true }
 
 [dependencies.toml]
