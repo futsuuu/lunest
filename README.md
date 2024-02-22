@@ -77,7 +77,7 @@ Asserts that `v` is not `false` or `nil`.
 
 Asserts that `a` is equal to `b`.
 
-Tables are checked recursively, and Lua functions are checked with the information from `debug.getinfo()`.
+Tables are checked recursively.
 
 #### Arguments
 
@@ -89,7 +89,7 @@ Tables are checked recursively, and Lua functions are checked with the informati
 
 Asserts that `a` is **not** equal to `b`.
 
-Tables are checked recursively, and Lua functions are checked with the information from `debug.getinfo()`.
+Tables are checked recursively.
 
 #### Arguments
 - **a** (_any_)
