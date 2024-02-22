@@ -139,8 +139,8 @@ fn single_value(lua: &Lua) -> LuaResult<()> {
 mod table {
     use super::*;
 
-    #[test]
-    fn cmp_integer_number() {
+    #[lua_module_test(lua_eval)]
+    fn cmp_integer_number(_lua: &Lua) -> LuaResult<()> {
         assert_eq!(
             Ordering::Greater,
             compare(&LuaValue::Number(2.1), &LuaValue::Integer(2))
@@ -149,6 +149,7 @@ mod table {
             Ordering::Less,
             compare(&LuaValue::Number(1.5), &LuaValue::Integer(2))
         );
+        Ok(())
     }
 
     #[lua_module_test(lua_eval)]
