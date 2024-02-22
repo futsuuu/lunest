@@ -64,6 +64,36 @@ This function should be only used to group some related tests or groups.
 - **name** (_string_): group name
 - **func** (_function_): defining child groups and tests
 
+### `require("lunest").assert(v, message)`
+
+Asserts that `v` is not `false` or `nil`.
+
+#### Arguments
+
+- **v** (_any_)
+- **message** (_string|nil_) optional message
+
+### `require("lunest").assert.eq(a, b)`
+
+Asserts that `a` is equal to `b`.
+
+Tables are checked recursively, and Lua functions are checked with the information from `debug.getinfo()`.
+
+#### Arguments
+
+- **a** (_any_)
+- **b** (_any_)
+
+### `require("lunest").assert.ne(a, b)`
+
+Asserts that `a` is **not** equal to `b`.
+
+Tables are checked recursively, and Lua functions are checked with the information from `debug.getinfo()`.
+
+#### Arguments
+- **a** (_any_)
+- **b** (_any_)
+
 ## Configuration
 
 You can use a TOML file located in `.lunest/config.toml` in current directory for configuration.

@@ -23,7 +23,7 @@ fn hello_world(lua: &Lua) -> LuaResult<()> {
 }
 
 #[cfg(test)]
-fn lua_eval(lua_code: String) -> std::process::Output {
+pub fn lua_eval(lua_code: String) -> std::process::Output {
     let root = project_root::get_project_root().unwrap();
     // "lua_rt" package was already built by xtask
     let mut cmd = std::process::Command::new(root.join("target/debug/lua_rt"));

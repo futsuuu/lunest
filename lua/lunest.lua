@@ -24,6 +24,7 @@ end
 
 local lib = load_dll()
 
+---@class lunest
 local M = {}
 
 ---Return a root element of the NodeID (same as file path) to determine that
@@ -44,6 +45,20 @@ function M.group(name, func)
   lib.group(where_called(), name, func)
 end
 
+---@class lunest.assert
+---@overload fun(v: any, message?: string)
+M.assert = setmetatable({}, { __call = lib.assert })
+
+function M.assert.eq(a, b)
+  return lib.assert_eq(a, b)
+end
+
+function M.assert.ne(a, b)
+  return lib.assert_ne(a, b)
+end
+
 package.loaded[MODNAME] = M
 
 lib.main()
+
+return M

@@ -1,3 +1,4 @@
+mod assert;
 mod node;
 mod state;
 #[cfg(feature = "test")]
@@ -45,6 +46,9 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
                 },
             )?,
         ),
+        ("assert", lua.create_function(assert::assert)?),
+        ("assert_eq", lua.create_function(assert::assert_eq)?),
+        ("assert_ne", lua.create_function(assert::assert_ne)?),
     ])
 }
 

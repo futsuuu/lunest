@@ -421,7 +421,9 @@ dependencies = [
  "lunest_macros",
  "lunest_shared",
  "mlua",
+ "once_cell",
  "project-root",
+ "regex",
  "scopeguard",
 ]
 
