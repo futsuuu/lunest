@@ -1,3 +1,4 @@
+mod assert;
 mod node;
 mod state;
 #[cfg(feature = "test")]
@@ -29,8 +30,8 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
         (
             "test",
             lua.create_function(
-                |lua, (path, name, func): (String, String, LuaFunction)| {
-                    test(lua, PathBuf::from(path), name, func).into_lua_err()?;
+                |lua, (pos, name, func): (CalledPos, String, LuaFunction)| {
+                    test(lua, pos.path, name, func).into_lua_err()?;
                     Ok(())
                 },
             )?,
@@ -38,13 +39,15 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
         (
             "group",
             lua.create_function(
-                |lua, (path, name, func): (String, String, LuaFunction)| {
-                    group(lua, PathBuf::from(path), NodeName::from(name), func)
-                        .into_lua_err()?;
+                |lua, (pos, name, func): (CalledPos, String, LuaFunction)| {
+                    group(lua, pos.path, NodeName::from(name), func).into_lua_err()?;
                     Ok(())
                 },
             )?,
         ),
+        ("assert", lua.create_function(assert::assert)?),
+        ("assert_eq", lua.create_function(assert::assert_eq)?),
+        ("assert_ne", lua.create_function(assert::assert_ne)?),
     ])
 }
 
@@ -173,4 +176,19 @@ fn lua_args(lua: &Lua) -> LuaResult<Vec<String>> {
     let mut vec = Vec::<String>::from_lua(args.clone(), lua)?;
     vec.insert(0, LuaTable::from_lua(args, lua)?.get::<_, String>(0)?);
     Ok(vec)
+}
+
+struct CalledPos {
+    path: PathBuf,
+    line: usize,
+}
+
+impl FromLua<'_> for CalledPos {
+    fn from_lua(value: LuaValue<'_>, lua: &Lua) -> LuaResult<Self> {
+        let value = LuaTable::from_lua(value, lua)?;
+        Ok(Self {
+            path: PathBuf::from(value.get::<_, String>("path")?),
+            line: value.get::<_, LuaInteger>("line")? as usize,
+        })
+    }
 }
