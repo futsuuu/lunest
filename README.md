@@ -71,9 +71,9 @@ Asserts that `v` is not `false` or `nil`.
 #### Arguments
 
 - **v** (_any_)
-- **message** (_string|nil_) optional message
+- **message** (_string|nil_) optional message, default is `""`.
 
-### `require("lunest").assert.eq(a, b)`
+### `require("lunest").assert.eq(a, b, message)`
 
 Asserts that `a` is equal to `b`.
 
@@ -83,8 +83,9 @@ Tables are checked recursively, and Lua functions are checked with the informati
 
 - **a** (_any_)
 - **b** (_any_)
+- **message** (_string|nil_) optional message, default is `"two values are not equal"`.
 
-### `require("lunest").assert.ne(a, b)`
+### `require("lunest").assert.ne(a, b, message)`
 
 Asserts that `a` is **not** equal to `b`.
 
@@ -93,6 +94,7 @@ Tables are checked recursively, and Lua functions are checked with the informati
 #### Arguments
 - **a** (_any_)
 - **b** (_any_)
+- **message** (_string|nil_) optional message, default is `"two values are equal"`.
 
 ## Configuration
 
