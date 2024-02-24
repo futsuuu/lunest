@@ -13,8 +13,6 @@ lua51 = ["mlua/lua51"]
 lua52 = ["mlua/lua52"]
 lua53 = ["mlua/lua53"]
 lua54 = ["mlua/lua54"]
-luajit = ["mlua/luajit"]
-luajit52 = ["mlua/luajit52"]
 # This feature is needed, but disabled by default because the current rust-analyzer also
 # enables "mlua/module" feature at the same time.
 vendored = ["mlua/vendored"]
