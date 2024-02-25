@@ -28,11 +28,39 @@ end)
 
 ## Requirements
 
-- A command that can run Lua files (e.g. `lua`, `nvim -l`)
+- A command to run Lua files (e.g. `lua`, `nvim -l`)
 
 ## Installation
 
-TODO
+You can download pre-compiled binaries from [GitHub Releases](https://github.com/futsuuu/lunest/releases/latest).
+
+Available targets:
+
+- macOS
+  - x86_64-apple-darwin
+  - aarch64-apple-darwin
+- Windows
+  - x86_64-pc-windows-msvc
+  - aarch64-pc-windows-msvc
+- Linux
+  - x86_64-unknown-linux-gnu
+  - aarch64-unknown-linux-gnu
+
+Linux (x86_64)
+
+```bash
+curl -o lunest -L https://github.com/futsuuu/lunest/releases/latest/download/lunest-x86_64-unknown-linux-gnu
+chmod +x lunest
+./lunest --help
+```
+
+Windows (x86_64)
+
+```powershell
+# PowerShell
+iwr -outfile lunest.exe https://github.com/futsuuu/lunest/releases/latest/download/lunest-x86_64-pc-windows-msvc.exe
+./lunest.exe --help
+```
 
 ## Command-line API
 
