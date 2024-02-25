@@ -1,10 +1,9 @@
 use std::{
-    fs,
     env::consts::*,
-    ffi::OsStr,
-    path::PathBuf,
+    fs,
     io::{BufRead, BufReader},
-    process::Stdio,
+    path::Path,
+    process::{Command, Stdio},
 };
 
 use anyhow::{bail, Result};
@@ -34,18 +33,30 @@ impl Build {
         if let Some(target) = self.target.as_ref() {
             cmd.args(["--target", target]);
         }
-        sep(&cmd);
-        if !cmd.status()?.success() {
-            bail!("build failed");
+
+        let dist = project_root::get_project_root()?.join("dist");
+        fs::create_dir_all(&dist)?;
+        let mut name = String::from("lunest");
+        if let Some(target) = self.target.as_ref() {
+            name += "-";
+            name += target;
         }
+        name += EXE_SUFFIX;
+        let dist = dist.join(name);
+        for_each_artifact(&mut cmd, |artifact| {
+            if artifact.name == "lunest" && artifact.typ == ArtifactType::Exe {
+                fs::copy(artifact.path, &dist)?;
+            }
+            Ok(())
+        })?;
+
         Ok(())
     }
 
     pub fn install(&self) -> Result<()> {
         self.build_libs(false)?;
         let mut cmd = cargo!("install");
-        cmd.args(["--package", "lunest"])
-            .args(["--path", "."]);
+        cmd.args(["--package", "lunest"]).args(["--path", "."]);
         if self.debug {
             cmd.arg("--debug");
         }
@@ -69,8 +80,8 @@ impl Build {
     fn build_lib(&self, lua: &Lua, test: bool) -> Result<()> {
         let mut cmd = cargo!("build");
         cmd.args(["--package", "lunest_lib"])
-            .args(["--message-format", "json-render-diagnostics"])
-            .args(["--no-default-features", "--features", lua.into()]);
+            .arg("--no-default-features")
+            .args(["--features", lua.into()]);
         if test {
             cmd.args(["--features", "test"]);
         }
@@ -81,40 +92,73 @@ impl Build {
             cmd.arg("--release");
         }
 
-        sep(&cmd);
-
-        let mut child = cmd.stdout(Stdio::piped()).spawn()?;
-        let mut reader = BufReader::new(child.stdout.take().unwrap());
-        loop {
-            let mut buffer = String::new();
-            if reader.read_line(&mut buffer)? == 0 {
-                break;
+        for_each_artifact(&mut cmd, |artifact| {
+            if artifact.name == "lunest_lib" && artifact.typ == ArtifactType::Dll {
+                fs::copy(artifact.path, lunest_shared::utils::dll_path(lua.into()))?;
             }
-            let Ok(artifact) = get_artifact(&buffer) else {
-                continue;
-            };
-            fs::copy(artifact, lunest_shared::utils::dll_path(lua.into()))?;
-        }
-        if !child.wait()?.success() {
-            bail!("build failed");
-        }
+            Ok(())
+        })?;
 
         Ok(())
     }
 }
 
-fn get_artifact(json: &str) -> Result<PathBuf> {
-    let json: serde_json::Value = serde_json::from_str(json)?;
-    let Some(filenames) = json.get("filenames") else {
-        bail!("'filenames' field not found");
-    };
-    let lib_name = format!("{DLL_PREFIX}lunest_lib{DLL_SUFFIX}");
-    let filenames: Vec<String> = serde_json::from_value(filenames.clone())?;
-    for filename in filenames {
-        let path = PathBuf::from(filename);
-        if Some(OsStr::new(&lib_name)) == path.file_name() {
-            return Ok(path);
+fn for_each_artifact<F>(cmd: &mut Command, f: F) -> Result<()>
+where
+    F: Fn(Artifact) -> Result<()>,
+{
+    use serde_json::Value;
+    cmd.args(["--message-format", "json-render-diagnostics"]);
+    sep(&cmd);
+    let mut child = cmd.stdout(Stdio::piped()).spawn()?;
+    let mut reader = BufReader::new(child.stdout.take().unwrap());
+    loop {
+        let mut buffer = String::new();
+        if reader.read_line(&mut buffer)? == 0 {
+            break;
+        }
+        let json: Value = serde_json::from_str(&buffer)?;
+        let Some(name) = json.get("target").and_then(|v| v.get("name")) else {
+            continue;
+        };
+        let name = name.as_str().unwrap();
+        if let Some(exe) = json.get("executable").and_then(Value::as_str) {
+            f(Artifact {
+                name,
+                path: Path::new(exe),
+                typ: ArtifactType::Exe,
+            })?;
+            continue;
+        }
+        let Some(filenames) = json.get("filenames").and_then(Value::as_array) else {
+            continue;
+        };
+        for file in filenames {
+            let path = Path::new(file.as_str().unwrap());
+            let filename = path.file_name().unwrap().to_str().unwrap();
+            if filename.starts_with(DLL_PREFIX) && filename.ends_with(DLL_SUFFIX) {
+                f(Artifact {
+                    name,
+                    path,
+                    typ: ArtifactType::Dll,
+                })?;
+            }
         }
     }
-    bail!("not found");
+    if !child.wait()?.success() {
+        bail!("build failed");
+    }
+    Ok(())
+}
+
+struct Artifact<'a> {
+    name: &'a str,
+    path: &'a Path,
+    typ: ArtifactType,
+}
+
+#[derive(PartialEq)]
+enum ArtifactType {
+    Exe,
+    Dll,
 }

@@ -52,16 +52,14 @@ jobs:
       - name: Setup cache for Rust
         uses: Swatinem/rust-cache@v2
 
-      - name: Setup Python
+      - name: Setup Zig
         if: runner.os == 'Linux'
-        uses: actions/setup-python@v5
-        with:
-          cache: pip
+        uses: goto-bus-stop/setup-zig@v2
 
       - name: Install cargo-zigbuild
         if: runner.os == 'Linux'
         run: |
-          pip install cargo-zigbuild
+          cargo install cargo-zigbuild
           echo "CARGO=$(which cargo-zigbuild)" >> $GITHUB_ENV
 
       - name: Compile
@@ -69,11 +67,15 @@ jobs:
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
 
+      - name: Trim glibc version
+        if: runner.os == 'Linux'
+        run: mv dist/lunest-${{ matrix.build-target }} dist/lunest-${{ matrix.target }}
+
       - name: Upload an artifact
         uses: actions/upload-artifact@v4
         with:
-          name: artifact-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/lunest${{ runner.os == 'Windows' && '.exe' || '' }}
+          name: dist-${{ matrix.target }}
+          path: dist/*
 
   publish:
     needs: [build]
@@ -91,6 +93,6 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifact-*/*
+          files: dist-*/*
           name: ${{ env.TAG }}
           token: ${{ secrets.GITHUB_TOKEN }}
