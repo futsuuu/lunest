@@ -1,8 +1,6 @@
-use std::process::Command;
-
 use anyhow::{bail, Result};
 
-use crate::sep;
+use crate::{cargo, sep};
 
 #[derive(clap::Parser)]
 pub struct Test {
@@ -12,9 +10,8 @@ pub struct Test {
 
 impl Test {
     pub fn test(&self) -> Result<()> {
-        let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("test")
-            .args(["--package", "lunest_shared"])
+        let mut cmd = cargo!("test");
+        cmd.args(["--package", "lunest_shared"])
             .arg("--all-features");
         sep(&cmd);
         if !cmd.status()?.success() {
@@ -40,9 +37,8 @@ impl Test {
     }
 
     fn test_lib(&self, lua: &crate::Lua) -> Result<()> {
-        let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("build")
-            .args(["--package", "lua_rt"])
+        let mut cmd = cargo!("build");
+        cmd.args(["--package", "lua_rt"])
             .arg("--no-default-features")
             .args(["--features", "vendored"])
             .args(["--features", lua.into()]);
@@ -51,9 +47,8 @@ impl Test {
             bail!("build failed");
         }
 
-        let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("test")
-            .args(["--package", "lunest_lib"])
+        let mut cmd = cargo!("test");
+        cmd.args(["--package", "lunest_lib"])
             .arg("--no-default-features")
             .args(["--features", lua.into()])
             .args(["--features", "test"]);

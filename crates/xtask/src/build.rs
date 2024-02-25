@@ -4,12 +4,12 @@ use std::{
     ffi::OsStr,
     path::PathBuf,
     io::{BufRead, BufReader},
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 use anyhow::{bail, Result};
 
-use crate::{sep, Common, Lua};
+use crate::{cargo, sep, Common, Lua};
 
 #[derive(clap::Parser)]
 pub struct Build {
@@ -26,8 +26,8 @@ pub struct Build {
 impl Build {
     pub fn build(&self) -> Result<()> {
         self.build_libs(false)?;
-        let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("build").args(["--package", "lunest"]);
+        let mut cmd = cargo!("build");
+        cmd.args(["--package", "lunest"]);
         if self.release || (cfg!(not(debug_assertions)) && !self.debug) {
             cmd.arg("--release");
         }
@@ -43,9 +43,8 @@ impl Build {
 
     pub fn install(&self) -> Result<()> {
         self.build_libs(false)?;
-        let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("install")
-            .args(["--package", "lunest"])
+        let mut cmd = cargo!("install");
+        cmd.args(["--package", "lunest"])
             .args(["--path", "."]);
         if self.debug {
             cmd.arg("--debug");
@@ -68,9 +67,8 @@ impl Build {
     }
 
     fn build_lib(&self, lua: &Lua, test: bool) -> Result<()> {
-        let mut cmd = Command::new(env!("CARGO"));
-        cmd.arg("build")
-            .args(["--package", "lunest_lib"])
+        let mut cmd = cargo!("build");
+        cmd.args(["--package", "lunest_lib"])
             .args(["--message-format", "json-render-diagnostics"])
             .args(["--no-default-features", "--features", lua.into()]);
         if test {

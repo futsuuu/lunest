@@ -72,3 +72,13 @@ fn sep(cmd: &Command) {
         lunest_shared::utils::command_to_string(cmd)
     );
 }
+
+macro_rules! cargo {
+    ($command:expr) => {{
+        let mut cargo = ::std::process::Command::new(env!("CARGO"));
+        cargo.env_remove("CARGO");
+        cargo.arg($command);
+        cargo
+    }}
+}
+pub(crate) use cargo;
