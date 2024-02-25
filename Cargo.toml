@@ -27,6 +27,10 @@ codegen-units = 1
 [profile.release.package.lunest_lib]
 strip = false
 
+[profile.release.package.xtask]
+opt-level = 0
+codegen-units = 256
+
 [package]
 name = "lunest"
 version.workspace = true
