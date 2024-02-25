@@ -27,9 +27,10 @@ impl Test {
 
     fn test_libs(&self) -> Result<()> {
         let build = crate::Build {
+            common: self.common.clone(),
             debug: false,
             release: false,
-            common: self.common.clone(),
+            target: None,
         };
         build.build_libs(true)?;
         for lua in &self.common.lua {

@@ -13,12 +13,14 @@ use crate::{sep, Common, Lua};
 
 #[derive(clap::Parser)]
 pub struct Build {
+    #[command(flatten)]
+    pub common: Common,
     #[arg(long, short)]
     pub release: bool,
     #[arg(long)]
     pub debug: bool,
-    #[command(flatten)]
-    pub common: Common,
+    #[arg(long)]
+    pub target: Option<String>,
 }
 
 impl Build {
@@ -28,6 +30,9 @@ impl Build {
         cmd.arg("build").args(["--package", "lunest"]);
         if self.release || (cfg!(not(debug_assertions)) && !self.debug) {
             cmd.arg("--release");
+        }
+        if let Some(target) = self.target.as_ref() {
+            cmd.args(["--target", target]);
         }
         sep(&cmd);
         if !cmd.status()?.success() {
@@ -42,10 +47,13 @@ impl Build {
         cmd.arg("install")
             .args(["--package", "lunest"])
             .args(["--path", "."]);
-        sep(&cmd);
         if self.debug {
             cmd.arg("--debug");
         }
+        if let Some(target) = self.target.as_ref() {
+            cmd.args(["--target", target]);
+        }
+        sep(&cmd);
         if cmd.status()?.success() {
             bail!("install failed");
         }
@@ -68,7 +76,10 @@ impl Build {
         if test {
             cmd.args(["--features", "test"]);
         }
-        if self.release {
+        if let Some(target) = self.target.as_ref() {
+            cmd.args(["--target", target]);
+        }
+        if self.release || (cfg!(not(debug_assertions)) && !self.debug) {
             cmd.arg("--release");
         }
 
