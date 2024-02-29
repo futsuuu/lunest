@@ -6,7 +6,7 @@ use mlua::prelude::*;
 #[cfg(test)]
 use super::lua_eval;
 use super::{group, test, TESTFILE};
-use crate::{ChildState, NodeID, State};
+use crate::{get_state, ChildState, NodeID, State};
 
 fn set_state<'a, I>(lua: &Lua, id: I) -> LuaResult<()>
 where
@@ -109,4 +109,40 @@ fn ignore_other_file(lua: &Lua) -> LuaResult<()> {
     assert!(lua.globals().get::<_, bool>("executed")?);
 
     Ok(())
+}
+
+mod get_result {
+    use super::*;
+
+    #[lua_module_test(lua_eval)]
+    fn success(lua: &Lua) -> LuaResult<()> {
+        set_state(lua, [TESTFILE, "test"])?;
+
+        group(lua, TESTFILE, Path::new(TESTFILE), |lua| {
+            test(lua, TESTFILE, "test", |_lua| Ok(()))
+        })?;
+
+        get_state!(lua, state);
+        assert!(state.as_child().unwrap().result.as_ref().unwrap().is_ok());
+        Ok(())
+    }
+
+    #[lua_module_test(lua_eval)]
+    fn failure(lua: &Lua) -> LuaResult<()> {
+        set_state(lua, [TESTFILE, "test"])?;
+
+        group(lua, TESTFILE, Path::new(TESTFILE), |lua| {
+            test(lua, TESTFILE, "test", |lua| {
+                lua.globals().get::<_, LuaFunction>("error")?.call("error!")
+            })
+        })?;
+
+        get_state!(lua, state);
+        let Some(Err(LuaError::CallbackError { .. })) =
+            state.as_child().unwrap().result.as_ref()
+        else {
+            unreachable!();
+        };
+        Ok(())
+    }
 }

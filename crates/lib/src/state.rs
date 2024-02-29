@@ -30,6 +30,13 @@ impl State {
             _ => None,
         }
     }
+
+    pub fn as_child(&self) -> Option<&ChildState> {
+        match self {
+            Self::Child(r) => Some(r),
+            _ => None,
+        }
+    }
 }
 
 macro_rules! get_state {
@@ -133,8 +140,9 @@ impl MainState {
 
 #[derive(Debug)]
 pub struct ChildState {
-    target: NodeID,
+    pub target: NodeID,
     depth: usize,
+    pub result: Option<LuaResult<()>>,
 }
 
 impl ChildState {
@@ -142,12 +150,16 @@ impl ChildState {
         Self {
             target: test,
             depth: 0,
+            result: None,
         }
     }
 
     pub fn is_target(&self, path: &PathBuf, name: &NodeName) -> bool {
-        self.target.get(0).unwrap().as_path() == Some(path)
-            && &self.target.get(self.depth).unwrap() == name
+        self.target.get_path() == Some(path)
+            && match self.target.get(self.depth) {
+                Some(t) => &t == name,
+                None => true,
+            }
     }
 
     pub fn move_to_child(&mut self) -> Option<NodeName> {
@@ -158,5 +170,9 @@ impl ChildState {
 
     pub fn move_to_parent(&mut self) {
         self.depth -= 1;
+    }
+
+    pub fn set_result(&mut self, result: LuaResult<()>) {
+        self.result = Some(result);
     }
 }

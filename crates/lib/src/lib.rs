@@ -4,9 +4,9 @@ mod state;
 #[cfg(feature = "test")]
 mod tests;
 
-use std::{env, path::PathBuf, process::exit};
+use std::{env, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use globwalk::GlobWalkerBuilder;
 use lunest_shared::{
     cli::{self, Parser as _},
@@ -23,7 +23,7 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
         (
             "main",
             lua.create_function(|lua, _: ()| {
-                main(lua).into_lua_err()?;
+                into_lua_err(main(lua))?;
                 Ok(())
             })?,
         ),
@@ -31,7 +31,7 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
             "test",
             lua.create_function(
                 |lua, (pos, name, func): (CalledPos, String, LuaFunction)| {
-                    test(lua, pos.path, name, func).into_lua_err()?;
+                    into_lua_err(test(lua, pos.path, name, func))?;
                     Ok(())
                 },
             )?,
@@ -40,7 +40,7 @@ fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
             "group",
             lua.create_function(
                 |lua, (pos, name, func): (CalledPos, String, LuaFunction)| {
-                    group(lua, pos.path, NodeName::from(name), func).into_lua_err()?;
+                    into_lua_err(group(lua, pos.path, NodeName::from(name), func))?;
                     Ok(())
                 },
             )?,
@@ -105,6 +105,14 @@ fn child_main(lua: &Lua, profile: Profile, test: NodeID) -> Result<()> {
     }
     State::Child(child_state).set(lua)?;
     lua.load(target_file).exec()?;
+
+    get_state!(lua, state);
+    if let Some(result) = state.as_child().unwrap().result.clone() {
+        result?;
+    } else {
+        bail!("test not found");
+    }
+
     Ok(())
 }
 
@@ -118,14 +126,11 @@ fn test(lua: &Lua, path: PathBuf, name: String, func: LuaFunction) -> Result<()>
             let parent_id = main_state.current_group.clone();
             main_state.insert_node(Test::new(parent_id, name)?)?;
         }
-        State::Child(child_state) => {
+        State::Child(ref mut child_state) => {
             if !child_state.is_target(&path, &name.into()) {
                 return Ok(());
             }
-            if let Err(e) = func.call::<_, ()>(()) {
-                eprintln!("{e}");
-                exit(1);
-            }
+            child_state.set_result(func.call(()));
         }
     }
 
@@ -172,6 +177,17 @@ fn lua_args(lua: &Lua) -> LuaResult<Vec<String>> {
     let mut vec = Vec::<String>::from_lua(args.clone(), lua)?;
     vec.insert(0, LuaTable::from_lua(args, lua)?.get::<_, String>(0)?);
     Ok(vec)
+}
+
+/// Downcast [`anyhow::Result`] to [`mlua::Result`] if needed to avoid nested stack traceback.
+fn into_lua_err<T>(result: Result<T>) -> LuaResult<T> {
+    let Err(error) = result else {
+        return Ok(result.ok().unwrap());
+    };
+    match error.root_cause().downcast_ref::<LuaError>() {
+        Some(error) => Err(error.clone()),
+        None => Err(error.into_lua_err()),
+    }
 }
 
 struct CalledPos {
