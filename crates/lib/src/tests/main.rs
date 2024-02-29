@@ -6,7 +6,7 @@ use mlua::prelude::*;
 #[cfg(test)]
 use super::lua_eval;
 use super::{group, test, TESTFILE};
-use crate::{Group, MainState, Node, NodeID, State, Test};
+use crate::{get_state, Group, MainState, Node, NodeID, State, Test};
 
 fn set_state(lua: &Lua) -> LuaResult<()> {
     State::Main(MainState::new()).set(lua)?;
@@ -39,8 +39,7 @@ mod load_test {
             })
         })?;
 
-        let state = State::get(lua)?;
-        let state = state.borrow::<State>()?;
+        get_state!(lua, state);
         let main_state = state.as_main().unwrap();
 
         let id = NodeID::from(vec![TESTFILE, "test"]);
@@ -68,8 +67,7 @@ mod load_test {
             })
         })?;
 
-        let state = State::get(lua)?;
-        let state = state.borrow::<State>()?;
+        get_state!(lua, state);
         let main_state = state.as_main().unwrap();
 
         let id = NodeID::from(vec![
@@ -96,8 +94,7 @@ mod load_test {
             Ok(())
         })?;
 
-        let state = State::get(lua)?;
-        let state = state.borrow::<State>()?;
+        get_state!(lua, state);
         let main_state = state.as_main().unwrap();
 
         let id = NodeID::from(vec![TESTFILE, "group 1"]);
@@ -141,8 +138,7 @@ fn ignore_other_file(lua: &Lua) -> LuaResult<()> {
         Ok(())
     })?;
 
-    let state = State::get(lua)?;
-    let state = state.borrow::<State>()?;
+    get_state!(lua, state);
     let main_state = state.as_main().unwrap();
 
     let id = NodeID::from(vec![TESTFILE, "group 2", "test"]);

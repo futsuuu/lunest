@@ -32,6 +32,18 @@ impl State {
     }
 }
 
+macro_rules! get_state {
+    ($lua:expr, mut $state:ident) => {
+        let $state = crate::state::State::get($lua)?;
+        let mut $state = $state.borrow_mut::<crate::state::State>()?;
+    };
+    ($lua:expr, $state:ident) => {
+        let $state = crate::state::State::get($lua)?;
+        let $state = $state.borrow::<crate::state::State>()?;
+    };
+}
+pub(crate) use get_state;
+
 #[derive(Debug)]
 pub struct MainState {
     pub root: Node,

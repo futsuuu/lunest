@@ -4,7 +4,7 @@ mod state;
 #[cfg(feature = "test")]
 mod tests;
 
-use std::{env, ops::DerefMut, path::PathBuf, process::exit};
+use std::{env, path::PathBuf, process::exit};
 
 use anyhow::Result;
 use globwalk::GlobWalkerBuilder;
@@ -15,7 +15,7 @@ use lunest_shared::{
 use mlua::prelude::*;
 
 use node::{Group, Name as NodeName, Node, Test, ID as NodeID};
-use state::{ChildState, MainState, State};
+use state::{get_state, ChildState, MainState, State};
 
 #[mlua::lua_module]
 fn lunest_lib(lua: &Lua) -> LuaResult<LuaTable> {
@@ -85,8 +85,7 @@ fn main(lua: &Lua) -> Result<()> {
     let main_file = lua.globals().get::<_, LuaTable>("arg")?.get(0)?;
     lua_cmd.push(main_file);
 
-    let state = State::get(lua)?;
-    let state = state.borrow::<State>()?;
+    get_state!(lua, state);
     state
         .as_main()
         .unwrap()
@@ -110,9 +109,8 @@ fn child_main(lua: &Lua, profile: Profile, test: NodeID) -> Result<()> {
 }
 
 fn test(lua: &Lua, path: PathBuf, name: String, func: LuaFunction) -> Result<()> {
-    let state = State::get(lua)?;
-    let mut state = state.borrow_mut::<State>()?;
-    match state.deref_mut() {
+    get_state!(lua, mut state);
+    match *state {
         State::Main(ref mut main_state) => {
             if !main_state.is_target(&path) {
                 return Ok(());
@@ -139,9 +137,8 @@ where
     N: Into<NodeName>,
 {
     let name = name.into();
-    let state = State::get(lua)?;
-    let mut state = state.borrow_mut::<State>()?;
-    match state.deref_mut() {
+    get_state!(lua, mut state);
+    match *state {
         State::Main(ref mut main_state) => {
             if !main_state.is_target(&path) {
                 return Ok(());
@@ -161,9 +158,8 @@ where
 
     func.call(())?;
 
-    let state = State::get(lua)?;
-    let mut state = state.borrow_mut::<State>()?;
-    match state.deref_mut() {
+    get_state!(lua, mut state);
+    match *state {
         State::Main(ref mut main_state) => main_state.move_to_parent(),
         State::Child(ref mut child_state) => child_state.move_to_parent(),
     }
