@@ -10,7 +10,7 @@ proc-macro = true
 lunest_shared.workspace = true
 quote = "1.0.35"
 proc-macro2 = { version = "1.0.78", optional = true }
-syn = { version = "2.0.51", features = ["full"], optional = true }
+syn = { version = "2.0.52", features = ["full"], optional = true }
 
 [features]
 test = [
