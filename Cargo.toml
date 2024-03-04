@@ -12,7 +12,7 @@ edition = "2021"
 [workspace.dependencies]
 lunest_macros = { path = "crates/macros" }
 lunest_shared = { path = "crates/shared" }
-mlua = "0.9.5"
+mlua = "0.9.6"
 anyhow = "1.0.80"
 clap = { version = "4.5.1", features = ["derive"] }
 project-root = "0.2.2"
