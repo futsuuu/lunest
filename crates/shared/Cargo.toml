@@ -11,7 +11,7 @@ serde = { version = "1.0.197", features = ["derive"], optional = true }
 merge = { version = "0.1.0", default-features = false, features = ["derive"], optional = true }
 
 [dependencies.toml]
-version = "0.8.10"
+version = "0.8.12"
 default-features = false
 features = ["parse"]
 optional = true
