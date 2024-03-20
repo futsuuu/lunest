@@ -13,8 +13,8 @@ edition = "2021"
 lunest_macros = { path = "crates/macros" }
 lunest_shared = { path = "crates/shared" }
 mlua = "0.9.6"
-anyhow = "1.0.80"
-clap = { version = "4.5.2", features = ["derive"] }
+anyhow = "1.0.81"
+clap = { version = "4.5.3", features = ["derive"] }
 project-root = "0.2.2"
 zip = { version = "0.6.6", default-features = false, features = ["zstd"] }
 
