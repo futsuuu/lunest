@@ -6,11 +6,29 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use clap::Parser;
 use notify::Watcher;
 use serde::Deserialize;
 use yansi::Paint;
 
+/// Lua testing framework
+#[derive(Debug, Parser)]
+#[command(version, about)]
+enum Args {
+    /// Run tests
+    #[command(visible_alias = "r")]
+    Run,
+}
+
 fn main() -> Result<()> {
+    let args = Args::parse();
+    match args {
+        Args::Run => run()?,
+    }
+    Ok(())
+}
+
+fn run() -> Result<()> {
     let root_dir = env::current_dir()?;
     let temp_dir = env::temp_dir().join("lunest");
     if temp_dir.try_exists()? {
