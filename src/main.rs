@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
     process,
     sync::mpsc,
-    thread,
 };
 
 use anyhow::{Context, Result};
@@ -32,7 +31,11 @@ fn main() -> Result<()> {
         &result_dir,
     )?;
 
-    let handle = thread::spawn(move || spawn_lua(&config.lua, &init_lua));
+    let mut process = process::Command::new(config.lua.first().context("command is empty")?)
+        .args(config.lua.get(1..).unwrap_or_default())
+        .arg(&init_lua)
+        .spawn()
+        .with_context(|| format!("failed to spawn process `{}`", config.lua[0]))?;
 
     let (tx, rx) = mpsc::channel();
     let mut watcher = notify::recommended_watcher(move |event| {
@@ -44,7 +47,7 @@ fn main() -> Result<()> {
 
     let mut results = Vec::new();
     loop {
-        if handle.is_finished() {
+        if process.try_wait()?.is_some() {
             break;
         }
         use notify::event::*;
@@ -61,9 +64,6 @@ fn main() -> Result<()> {
     }
 
     drop(watcher);
-    if let Ok(result) = handle.join() {
-        result?;
-    }
     fs::remove_dir_all(&temp_dir)?;
 
     println!(
@@ -74,18 +74,6 @@ fn main() -> Result<()> {
     if results.iter().any(|r| !r.success()) {
         process::exit(1);
     }
-    Ok(())
-}
-
-fn spawn_lua(command: &[String], file_path: &Path) -> Result<()> {
-    let mut cmd = process::Command::new(command.first().context("command is empty")?);
-    cmd.args(command.get(1..).unwrap_or_default())
-        .arg(file_path);
-    let status = cmd
-        .spawn()
-        .with_context(|| format!("failed to spawn process `{}`", command[0]))?
-        .wait()?;
-    anyhow::ensure!(status.success());
     Ok(())
 }
 
