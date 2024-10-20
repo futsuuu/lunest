@@ -42,6 +42,7 @@ fn main() -> Result<()> {
     })?;
     watcher.watch(&result_dir, notify::RecursiveMode::NonRecursive)?;
 
+    let mut results = Vec::new();
     loop {
         if handle.is_finished() {
             break;
@@ -55,6 +56,7 @@ fn main() -> Result<()> {
         for path in paths {
             let result: TestResult = serde_json::from_str(&fs::read_to_string(path)?)?;
             result.print();
+            results.push(result);
         }
     }
 
@@ -62,8 +64,16 @@ fn main() -> Result<()> {
     if let Ok(result) = handle.join() {
         result?;
     }
-
     fs::remove_dir_all(&temp_dir)?;
+
+    println!(
+        "\nsuccess: {}, error: {}",
+        results.iter().filter(|r| r.success()).count().green(),
+        results.iter().filter(|r| !r.success()).count().red(),
+    );
+    if results.iter().any(|r| !r.success()) {
+        process::exit(1);
+    }
     Ok(())
 }
 
@@ -174,6 +184,9 @@ enum TestError {
 }
 
 impl TestResult {
+    fn success(&self) -> bool {
+        self.error.is_none()
+    }
     fn print(&self) {
         print!(
             "{}{} ",
