@@ -1,3 +1,5 @@
+mod config;
+
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -10,6 +12,8 @@ use clap::Parser;
 use notify::Watcher;
 use serde::Deserialize;
 use yansi::Paint;
+
+use config::Config;
 
 /// Lua testing framework
 #[derive(Debug, Parser)]
@@ -45,22 +49,27 @@ fn run_cmd() -> Result<()> {
         fs::create_dir_all(&temp_dir)?;
     }
 
-    let config = read_config(&root_dir)?;
+    let config = Config::read(&root_dir)?;
     let init_lua = temp_dir.join("init.lua");
     let result_dir = temp_dir.join("result");
     fs::create_dir(&result_dir)?;
     setup_init_lua(
         &init_lua,
         &root_dir,
-        &expand_glob(&root_dir, &config.files)?,
+        &config.target_files(&root_dir)?,
         &result_dir,
     )?;
 
-    let mut process = process::Command::new(config.lua.first().context("command is empty")?)
-        .args(config.lua.get(1..).unwrap_or_default())
-        .arg(&init_lua)
-        .spawn()
-        .with_context(|| format!("failed to spawn process `{}`", config.lua[0]))?;
+    let mut process = {
+        let mut cmd = config.lua_command()?;
+        cmd.arg(&init_lua);
+        cmd.spawn().with_context(|| {
+            format!(
+                "failed to spawn process `{}`",
+                cmd.get_program().to_str().unwrap()
+            )
+        })?
+    };
 
     let (tx, rx) = mpsc::channel();
     let mut watcher = notify::recommended_watcher(move |event| {
@@ -147,61 +156,6 @@ fn setup_init_lua(
     Ok(())
 }
 
-fn read_config(root_dir: &Path) -> Result<Config> {
-    let paths = [
-        root_dir.join(".config").join("lunest.toml"),
-        root_dir.join("lunest.toml"),
-        root_dir.join(".lunest.toml"),
-    ];
-    let config = if let Some(s) = paths.iter().find_map(|p| fs::read_to_string(p).ok()) {
-        toml::from_str(&s)?
-    } else {
-        Config::default()
-    };
-    Ok(config)
-}
-
-fn expand_glob(
-    root_dir: impl AsRef<Path>,
-    patterns: impl IntoIterator<Item = impl AsRef<str>>,
-) -> Result<Vec<PathBuf>> {
-    let root = root_dir.as_ref();
-    let set = {
-        let mut builder = globset::GlobSet::builder();
-        for pat in patterns {
-            builder.add(globset::Glob::new(pat.as_ref())?);
-        }
-        builder.build()?
-    };
-    let mut r = Vec::new();
-    for entry in walkdir::WalkDir::new(root).sort_by_file_name() {
-        let entry = entry?;
-        let Ok(metadata) = entry.metadata() else {
-            continue;
-        };
-        if metadata.is_file() && set.is_match(entry.path().strip_prefix(root).unwrap()) {
-            r.push(entry.into_path());
-        }
-    }
-    Ok(r)
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-struct Config {
-    lua: Vec<String>,
-    files: Vec<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            lua: vec!["lua".into()],
-            files: vec!["{lua,src}/**/*.lua".into()],
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 struct TestResult {
     title: Vec<String>,
@@ -217,6 +171,7 @@ impl TestResult {
     fn success(&self) -> bool {
         self.error.is_none()
     }
+
     fn print(&self) {
         print!(
             "{}{} ",
