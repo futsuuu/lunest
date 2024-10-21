@@ -1,5 +1,5 @@
 use std::{
-    env, fs, io,
+    env, fs,
     path::{Path, PathBuf},
     process,
     sync::mpsc,
@@ -148,14 +148,16 @@ fn setup_init_lua(
 }
 
 fn read_config(root_dir: &Path) -> Result<Config> {
-    let config_path = root_dir.join(".lunest").join("config.toml");
-    let config = match fs::read_to_string(config_path) {
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            return Ok(Default::default());
-        }
-        r => r?,
+    let paths = [
+        root_dir.join(".config").join("lunest.toml"),
+        root_dir.join("lunest.toml"),
+        root_dir.join(".lunest.toml"),
+    ];
+    let config = if let Some(s) = paths.iter().find_map(|p| fs::read_to_string(p).ok()) {
+        toml::from_str(&s)?
+    } else {
+        Config::default()
     };
-    let config = toml::from_str(&config)?;
     Ok(config)
 }
 
