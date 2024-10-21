@@ -236,6 +236,6 @@ do
     end
 end
 
-if arg[0] then
+if arg[0] == debug.getinfo(1, "S").source:gsub("^@", "") then
     main()
 end
