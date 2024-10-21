@@ -1,4 +1,3 @@
----@class lunest
 local M = {}
 
 ---@class lunest.Test
