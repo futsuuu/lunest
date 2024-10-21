@@ -21,10 +21,15 @@ use config::Config;
 enum Args {
     /// Run tests
     #[command(visible_alias = "r")]
-    Run,
+    Run {
+        /// Run tests with the specified profile
+        #[arg(long, short)]
+        profile: Option<String>,
+    },
+
     /// Print wrapper Lua code used for in-source testing
     Wrapper {
-        /// Write code into specified file
+        /// Write code into the specified file
         #[arg(long, short, value_name = "FILE")]
         save: Option<PathBuf>,
     },
@@ -33,13 +38,13 @@ enum Args {
 fn main() -> Result<()> {
     let args = Args::parse();
     match args {
-        Args::Run => run_cmd()?,
+        Args::Run { profile } => run_cmd(profile)?,
         Args::Wrapper { save } => wrapper_cmd(save)?,
     }
     Ok(())
 }
 
-fn run_cmd() -> Result<()> {
+fn run_cmd(profile: Option<String>) -> Result<()> {
     let root_dir = env::current_dir()?;
     let temp_dir = env::temp_dir().join("lunest");
     if temp_dir.try_exists()? {
@@ -50,18 +55,21 @@ fn run_cmd() -> Result<()> {
     }
 
     let config = Config::read(&root_dir)?;
+    let (profile_name, profile) = config.profile(profile.as_deref())?;
+    println!("run with profile '{}'\n", profile_name.bold());
+
     let init_lua = temp_dir.join("init.lua");
     let result_dir = temp_dir.join("result");
     fs::create_dir(&result_dir)?;
     setup_init_lua(
         &init_lua,
         &root_dir,
-        &config.target_files(&root_dir)?,
+        &profile.target_files(&root_dir)?,
         &result_dir,
     )?;
 
     let mut process = {
-        let mut cmd = config.lua_command()?;
+        let mut cmd = profile.lua_command()?;
         cmd.arg(&init_lua);
         cmd.spawn().with_context(|| {
             format!(
