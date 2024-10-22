@@ -10,6 +10,7 @@ use merge::Merge;
 use serde::Deserialize;
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct Config {
     profile: HashMap<String, Profile>,
 }
