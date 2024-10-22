@@ -17,14 +17,16 @@ pub struct Config {
 #[derive(Clone, Debug, Deserialize, Merge)]
 pub struct Profile {
     lua: Option<Vec<String>>,
-    files: Option<Vec<String>>,
+    include: Option<Vec<String>>,
+    exclude: Option<Vec<String>>,
 }
 
 impl Default for Profile {
     fn default() -> Self {
         Self {
             lua: Some(vec!["lua".into()]),
-            files: Some(vec!["{src,lua}/**/*.lua".into()]),
+            include: Some(vec!["{src,lua}/**/*.lua".into()]),
+            exclude: Some(vec![]),
         }
     }
 }
@@ -79,23 +81,37 @@ impl Profile {
     }
 
     pub fn target_files(&self, root_dir: &Path) -> Result<Vec<PathBuf>> {
-        let set = {
-            let mut builder = globset::GlobSet::builder();
-            for pat in self.files.as_ref().unwrap() {
-                builder.add(globset::Glob::new(pat)?);
-            }
-            builder.build()?
-        };
+        let include = build_globset(self.include.as_ref().unwrap())?;
+        let exclude = build_globset(self.exclude.as_ref().unwrap())?;
         let mut r = Vec::new();
-        for entry in walkdir::WalkDir::new(root_dir).sort_by_file_name() {
+        for entry in walkdir::WalkDir::new(root_dir)
+            .follow_links(true)
+            .sort_by_file_name()
+            .into_iter()
+            .filter_entry(|entry| {
+                let path = entry.path().strip_prefix(root_dir).unwrap();
+                if exclude.is_match(path) {
+                    false
+                } else if entry.file_type().is_dir() {
+                    true
+                } else {
+                    include.is_match(path)
+                }
+            })
+        {
             let entry = entry?;
-            let Ok(metadata) = entry.metadata() else {
-                continue;
-            };
-            if metadata.is_file() && set.is_match(entry.path().strip_prefix(root_dir).unwrap()) {
-                r.push(entry.into_path());
+            if entry.file_type().is_file() {
+                r.push(entry.into_path())
             }
         }
         Ok(r)
     }
+}
+
+fn build_globset(patterns: &[String]) -> Result<globset::GlobSet> {
+    let mut builder = globset::GlobSet::builder();
+    for pat in patterns {
+        builder.add(globset::Glob::new(pat)?);
+    }
+    Ok(builder.build()?)
 }
