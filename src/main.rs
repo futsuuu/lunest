@@ -89,10 +89,16 @@ fn run_cmd(profile: Option<String>) -> Result<()> {
     watcher.watch(&result_dir, notify::RecursiveMode::NonRecursive)?;
 
     let mut results = Vec::new();
+
     loop {
-        if process.try_wait()?.is_some() {
-            break;
+        if let Some(status) = process.try_wait()? {
+            match status.code() {
+                Some(0) => break,
+                Some(n) => anyhow::bail!("spawned process exited with status code {n}"),
+                None => anyhow::bail!("spawned process terminated by signal"),
+            }
         }
+
         use notify::event::*;
         let paths = match rx.try_recv() {
             Ok(e) if e.kind == EventKind::Access(AccessKind::Close(AccessMode::Write)) => e.paths,
