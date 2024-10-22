@@ -1,3 +1,4 @@
+-- NOTE: **DO NOT** import this module directly from the other modules using `require()`.
 local M = {}
 
 local Group = require("lunest.Group")

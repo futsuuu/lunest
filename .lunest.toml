@@ -1,0 +1,6 @@
+[profile.default]
+lua = ["lua"]
+init = "test_init.lua"
+
+[profile.nvim]
+lua = ["nvim", "-l"]
