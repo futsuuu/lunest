@@ -20,3 +20,7 @@ notify = "6.1"
 # cli
 clap = { version = "4.5", features = ["derive"] }
 yansi = "1.0"
+
+[build-dependencies]
+anyhow = "1.0"
+walkdir = "2.5"

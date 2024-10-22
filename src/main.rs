@@ -156,7 +156,7 @@ fn setup_init_lua(
             p.display().to_string().replace('\\', r"\\"),
         )
     });
-    let contents = include_str!("init.lua")
+    let contents = include_str!(concat!(env!("OUT_DIR"), "/main.lua"))
         .replace(
             "local TARGET_FILES\n",
             &format!("local TARGET_FILES = {{ {files} }}\n"),
