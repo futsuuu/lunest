@@ -1,0 +1,12 @@
+{
+    "runtime": {
+        "pathStrict": true,
+        "path": [
+            "lua/?.lua",
+            "lua/?/init.lua"
+        ]
+    },
+    "workspace": {
+        "checkThirdParty": false
+    }
+}
