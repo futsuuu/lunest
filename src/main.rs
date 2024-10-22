@@ -66,6 +66,7 @@ fn run_cmd(profile: Option<String>) -> Result<()> {
         &root_dir,
         &profile.target_files(&root_dir)?,
         &result_dir,
+        profile.init_file()?,
     )?;
 
     let mut process = {
@@ -139,6 +140,7 @@ fn setup_init_lua(
     root_dir: &Path,
     target_files: &[PathBuf],
     result_dir: &Path,
+    init_file: Option<&Path>,
 ) -> Result<()> {
     let files: String = target_files.iter().fold(String::new(), |acc, p| {
         let name = p.strip_prefix(root_dir).unwrap_or(p);
@@ -160,6 +162,17 @@ fn setup_init_lua(
                 result_dir.display().to_string().replace('\\', r"\\")
             ),
         );
+    let contents = if let Some(path) = init_file {
+        contents.replace(
+            "local INIT_FILE\n",
+            &format!(
+                "local INIT_FILE = \"{}\"\n",
+                path.display().to_string().replace('\\', r"\\"),
+            ),
+        )
+    } else {
+        contents
+    };
     fs::write(path, contents)?;
     Ok(())
 }

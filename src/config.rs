@@ -19,6 +19,7 @@ pub struct Profile {
     lua: Option<Vec<String>>,
     include: Option<Vec<String>>,
     exclude: Option<Vec<String>>,
+    init: Option<PathBuf>,
 }
 
 impl Default for Profile {
@@ -27,6 +28,7 @@ impl Default for Profile {
             lua: Some(vec!["lua".into()]),
             include: Some(vec!["{src,lua}/**/*.lua".into()]),
             exclude: Some(vec![]),
+            init: None,
         }
     }
 }
@@ -67,7 +69,12 @@ impl Config {
         } else {
             anyhow::bail!("you must specify the profile or define a 'default' profile");
         };
+
+        if let (Some(exclude), Some(path)) = (profile.exclude.as_mut(), profile.init.as_ref()) {
+            exclude.push(path.display().to_string());
+        }
         profile.merge(Profile::default());
+
         Ok((name, profile))
     }
 }
@@ -105,6 +112,17 @@ impl Profile {
             }
         }
         Ok(r)
+    }
+
+    pub fn init_file(&self) -> Result<Option<&Path>> {
+        if let Some(path) = self.init.as_ref() {
+            anyhow::ensure!(
+                path.exists(),
+                "init file `{}` does not exist",
+                path.display(),
+            );
+        }
+        Ok(self.init.as_deref())
     }
 }
 

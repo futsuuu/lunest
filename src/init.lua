@@ -43,6 +43,11 @@ do
     function main()
         package.loaded.lunest = setmetatable({}, M)
 
+        local init_file = bridge.get_init_file()
+        if init_file then
+            dofile(init_file)
+        end
+
         for _, file in ipairs(bridge.get_target_files()) do
             run_toplevel_group(file.name, file.path)
         end
@@ -182,10 +187,17 @@ do
     local TARGET_FILES
     ---@type string
     local RESULT_DIR
+    ---@type string?
+    local INIT_FILE
 
     ---@return { name: string, path: string }[]
     function bridge.get_target_files()
         return TARGET_FILES
+    end
+
+    ---@return string?
+    function bridge.get_init_file()
+        return INIT_FILE
     end
 
     local null = {}
