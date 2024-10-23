@@ -54,6 +54,8 @@ local function main()
     for _, file in ipairs(bridge.get_target_files()) do
         run_toplevel_group(file.name, file.path)
     end
+
+    bridge.finish()
 end
 
 if arg[0] == debug.getinfo(1, "S").source:gsub("^@", "") then

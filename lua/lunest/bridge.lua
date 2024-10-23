@@ -3,7 +3,7 @@ local M = {}
 ---@type { name: string, path: string }[]
 local TARGET_FILES
 ---@type string
-local RESULT_DIR
+local MSG_FILE
 ---@type string?
 local INIT_FILE
 
@@ -47,21 +47,31 @@ local function json_encode(obj)
     return (s:gsub("\\\n", "\\n"))
 end
 
-local counter = 0
+---@type file*
+local msg_file
 
 ---@param title string[]
 ---@param err string?
 function M.write_result(title, err)
-    local result = {
-        title = title,
+    if not msg_file then
+        msg_file = assert(io.open(MSG_FILE, "a"))
+    end
+    local msg = {
+        TestResult = {
+            title = title,
+        }
     }
     if err then
-        result.error = { Msg = err }
+        msg.TestResult.error = { Msg = err }
     end
-    local file = assert(io.open(("%s/%x.json"):format(RESULT_DIR, counter), "w"))
-    assert(file:write(json_encode(result)))
-    assert(file:close())
-    counter = counter + 1
+    assert(msg_file:write(json_encode(msg) .. "\n"))
+    msg_file:flush()
+end
+
+function M.finish()
+    if msg_file then
+        assert(msg_file:close())
+    end
 end
 
 return M
