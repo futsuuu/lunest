@@ -5,8 +5,8 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use crossterm::{style::Stylize, terminal};
 use serde::Deserialize;
-use yansi::Paint;
 
 #[derive(Debug)]
 pub struct Bridge {
@@ -76,42 +76,60 @@ impl Bridge {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub enum Message {
-    TestResult(TestResult),
+fn fmt_title(title: &[String]) -> String {
+    title.join(&" :: ".dim().to_string())
 }
 
 #[derive(Debug, Deserialize)]
-pub struct TestResult {
+pub enum Message {
+    TestStarted(TestStarted),
+    TestFinished(TestFinished),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TestStarted {
+    title: Vec<String>,
+}
+
+impl fmt::Display for TestStarted {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{} {}",
+            fmt_title(&self.title),
+            ":".dim(),
+            "RUNNING".cyan().bold()
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TestFinished {
     title: Vec<String>,
     error: Option<TestError>,
 }
 
-#[derive(Debug, Deserialize)]
-pub enum TestError {
-    Msg(String),
-}
-
-impl TestResult {
+impl TestFinished {
     pub fn success(&self) -> bool {
         self.error.is_none()
     }
 }
 
-impl fmt::Display for TestResult {
+impl fmt::Display for TestFinished {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}{} ",
-            self.title.join(&" :: ".dim().to_string()),
-            ":".dim()
-        )?;
+        write!(f, "{}", terminal::Clear(terminal::ClearType::UntilNewLine))?;
+        write!(f, "{}{} ", fmt_title(&self.title), ":".dim())?;
         if let Some(err) = &self.error {
             write!(f, "{}\n{}", "ERR".red().bold(), err)
         } else {
             write!(f, "{}", "OK".green().bold())
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub enum TestError {
+    Msg(String),
 }
 
 impl fmt::Display for TestError {

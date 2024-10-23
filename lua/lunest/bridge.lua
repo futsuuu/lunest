@@ -7,6 +7,20 @@ local MSG_FILE
 ---@type string?
 local INIT_FILE
 
+---@class lunest.bridge.Message
+---@field TestStarted? lunest.bridge.TestStarted
+---@field TestFinished? lunest.bridge.TestFinished
+
+---@class lunest.bridge.TestStarted
+---@field title string[]
+
+---@class lunest.bridge.TestFinished
+---@field title string[]
+---@field error lunest.bridge.TestError?
+
+---@class lunest.bridge.TestError
+---@field Msg? string
+
 ---@return { name: string, path: string }[]
 function M.get_target_files()
     return TARGET_FILES
@@ -50,22 +64,33 @@ end
 ---@type file*
 local msg_file
 
----@param title string[]
----@param err string?
-function M.write_result(title, err)
+---@param message lunest.bridge.Message
+local function write_msg(message)
     if not msg_file then
         msg_file = assert(io.open(MSG_FILE, "a"))
     end
+    assert(msg_file:write(json_encode(message) .. "\n"))
+    msg_file:flush()
+end
+
+---@param title string[]
+function M.start_test(title)
+    write_msg({
+        TestStarted = { title = title },
+    })
+end
+
+---@param title string[]
+---@param err string?
+function M.finish_test(title, err)
+    ---@type lunest.bridge.Message
     local msg = {
-        TestResult = {
-            title = title,
-        }
+        TestFinished = { title = title },
     }
     if err then
-        msg.TestResult.error = { Msg = err }
+        msg.TestFinished.error = { Msg = err }
     end
-    assert(msg_file:write(json_encode(msg) .. "\n"))
-    msg_file:flush()
+    write_msg(msg)
 end
 
 function M.finish()

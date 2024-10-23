@@ -38,14 +38,18 @@ end
 
 ---@param func fun()
 function M:wrap(func)
+    local title = self:get_title()
     return function()
+        bridge.start_test(title)
+
         local success, err = pcall(func)
         if success then
             err = nil
         else
             err = err and tostring(err) or "error occurred without message"
         end
-        bridge.write_result(self:get_title(), err)
+
+        bridge.finish_test(title, err)
     end
 end
 

@@ -1,11 +1,16 @@
 mod bridge;
 mod config;
 
-use std::{env, fs, path::PathBuf, process};
+use std::{
+    env, fs,
+    io::{self, Write},
+    path::PathBuf,
+    process,
+};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use yansi::Paint;
+use crossterm::{cursor, style::Stylize};
 
 use config::Config;
 
@@ -83,9 +88,13 @@ fn run_cmd(profile: Option<String>) -> Result<()> {
     loop {
         if let Some(message) = bridge.read()? {
             match message {
-                bridge::Message::TestResult(result) => {
-                    println!("{result}");
-                    results.push(result);
+                bridge::Message::TestFinished(t) => {
+                    println!("{t}");
+                    results.push(t);
+                }
+                bridge::Message::TestStarted(t) => {
+                    print!("{t}{}", cursor::MoveToColumn(0));
+                    let _ = io::stdout().flush();
                 }
             }
         } else if let Some(status) = process.try_wait()? {
@@ -99,12 +108,13 @@ fn run_cmd(profile: Option<String>) -> Result<()> {
 
     fs::remove_dir_all(&temp_dir)?;
 
+    let (success, error): (Vec<_>, Vec<_>) = results.iter().partition(|r| r.success());
     println!(
         "\nsuccess: {}, error: {}",
-        results.iter().filter(|r| r.success()).count().green(),
-        results.iter().filter(|r| !r.success()).count().red(),
+        success.len().to_string().green(),
+        error.len().to_string().red(),
     );
-    if results.iter().any(|r| !r.success()) {
+    if !error.is_empty() {
         process::exit(1);
     }
     Ok(())
