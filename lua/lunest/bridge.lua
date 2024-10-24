@@ -1,5 +1,7 @@
 local M = {}
 
+---@type string
+local ROOT_DIR
 ---@type { name: string, path: string }[]
 local TARGET_FILES
 ---@type string
@@ -20,6 +22,10 @@ local INIT_FILE
 
 ---@class lunest.bridge.TestError
 ---@field Msg? string
+
+function M.root_dir()
+    return ROOT_DIR
+end
 
 ---@return { name: string, path: string }[]
 function M.get_target_files()

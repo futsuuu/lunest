@@ -4,6 +4,7 @@ local M = {}
 local Group = require("lunest.Group")
 local Test = require("lunest.Test")
 local bridge = require("lunest.bridge")
+local module = require("lunest.module")
 
 ---@param name string
 ---@param func fun()
@@ -24,22 +25,9 @@ end
 ---@param path string
 local function run_toplevel_group(name, path)
     local group = Group.new(name, path)
-
-    group:run(function()
-        local modules = {} ---@type table<string, true>
-        for key, _ in pairs(package.loaded) do
-            modules[key] = true
-        end
-
-        dofile(path)
-
-        for key, _ in pairs(package.loaded) do
-            if not modules[key] then
-                package.loaded[key] = nil
-            end
-        end
-    end)
-
+    group:run(module.isolated(function()
+        assert(loadfile(path))(module.name(path))
+    end))
     group:finish()
 end
 

@@ -52,6 +52,13 @@ impl Bridge {
         });
         let contents = contents
             .replace(
+                "local ROOT_DIR\n",
+                &format!(
+                    "local ROOT_DIR = \"{}\"\n",
+                    root_dir.display().to_string().replace('\\', r"\\")
+                ),
+            )
+            .replace(
                 "local TARGET_FILES\n",
                 &format!("local TARGET_FILES = {{ {files} }}\n"),
             )
