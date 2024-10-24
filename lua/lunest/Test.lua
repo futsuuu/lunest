@@ -18,7 +18,7 @@ function M.new(name, source)
     local self = {
         name = name,
         source = source,
-        parent = assert(Group.current),
+        parent = assert(Group.current()),
     }
     return setmetatable(self, M)
 end

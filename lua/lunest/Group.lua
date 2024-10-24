@@ -9,7 +9,12 @@ local M = {}
 M.__index = M
 
 ---@type lunest.Group?
-M.current = nil
+local current = nil
+
+---@return lunest.Group?
+function M.current()
+    return current
+end
 
 ---@param name string
 ---@param source string
@@ -19,16 +24,16 @@ function M.new(name, source)
     local self = {
         name = name,
         source = source,
-        parent = M.current,
+        parent = current,
         deferred = {},
     }
     setmetatable(self, M)
-    M.current = self
+    current = self
     return self
 end
 
 function M:finish()
-    M.current = self.parent
+    current = self.parent
 end
 
 ---@return boolean
