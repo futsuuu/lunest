@@ -5,9 +5,6 @@
 ---@field deferred fun()[]
 local M = {}
 
----@private
-M.__index = M
-
 ---@type lunest.Group?
 local current = nil
 
@@ -15,6 +12,9 @@ local current = nil
 function M.current()
     return current
 end
+
+---@private
+M.__index = M
 
 ---@param name string
 ---@param source string
@@ -28,12 +28,25 @@ function M.new(name, source)
         deferred = {},
     }
     setmetatable(self, M)
-    current = self
+    if self.parent and self.parent:is_toplevel() then
+        self.parent:defer(function()
+            current = self
+        end)
+    else
+        current = self
+    end
     return self
 end
 
 function M:finish()
-    current = self.parent
+    local function inner()
+        current = self.parent
+    end
+    if self.parent and self.parent:is_toplevel() then
+        self.parent:defer(inner)
+    else
+        inner()
+    end
 end
 
 ---@return boolean
