@@ -39,16 +39,29 @@ end
 
 local null = {}
 
+---@param obj any
+---@return string
+local function format_q(obj)
+    return (
+        ("%q")
+            :format(obj)
+            :gsub("\\\n", [[\n]])
+            :gsub([[([^\])\8]], [[%1\b]])
+            :gsub([[([^\])\9]], [[%1\t]])
+            :gsub([[([^\])\12]], [[%1\f]])
+            :gsub([[([^\])\13]], [[%1\r]])
+    )
+end
+
 ---@return string
 local function json_encode(obj)
-    local s
     local t = type(obj)
     if t == "nil" or obj == null then
-        s = "null"
+        return "null"
     elseif t == "number" or t == "boolean" then
-        s = tostring(obj)
+        return tostring(obj)
     elseif t == "string" then
-        s = ("%q"):format(obj)
+        return format_q(obj)
     elseif t ~= "table" then
         error(("invalid type '%s'"):format(t))
     elseif obj[1] then
@@ -56,15 +69,14 @@ local function json_encode(obj)
         for _, value in ipairs(obj) do
             table.insert(ss, json_encode(value))
         end
-        s = "[" .. table.concat(ss, ",") .. "]"
+        return "[" .. table.concat(ss, ",") .. "]"
     else
         local ss = {}
         for key, value in pairs(obj) do
-            table.insert(ss, ("%q:%s"):format(key, json_encode(value)))
+            table.insert(ss, format_q(key) .. ":" .. json_encode(value))
         end
-        s = "{" .. table.concat(ss, ",") .. "}"
+        return "{" .. table.concat(ss, ",") .. "}"
     end
-    return (s:gsub("\\\n", "\\n"))
 end
 
 ---@type file*
