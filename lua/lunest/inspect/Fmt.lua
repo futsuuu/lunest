@@ -31,6 +31,15 @@ function M.str(folded, expanded)
     end)
 end
 
+---@param fn fun(folded: boolean): ((string | lunest.inspect.Fmt)[])
+function M.fn(fn)
+    return M.new(function()
+        return fn(true)
+    end, function()
+        return fn(false)
+    end)
+end
+
 ---@param str string
 ---@return string
 local function get_lastline(str)

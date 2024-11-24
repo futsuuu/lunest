@@ -104,9 +104,7 @@ end)
 
 ---@param path any[]
 local function display_path(path)
-    ---@param folded boolean
-    ---@return (string | lunest.inspect.Fmt)[]
-    local function fmt(folded)
+    return Fmt.fn(function(folded)
         local r = { ROOT_VALUE }
         for _, obj in ipairs(path) do
             if not folded then
@@ -119,12 +117,6 @@ local function display_path(path)
             table.insert(r, key)
         end
         return r
-    end
-
-    return Fmt.new(function()
-        return fmt(true)
-    end, function()
-        return fmt(false)
     end)
 end
 
@@ -209,9 +201,7 @@ function format(object)
         return Fmt.str("{}")
     end
 
-    ---@param folded boolean
-    ---@return (string | lunest.inspect.Fmt)[]
-    local function fmt(folded)
+    return Fmt.fn(function(folded)
         ---@type (string | lunest.inspect.Fmt)[]
         local r = { folded and "{ " or "{\n" }
 
@@ -233,16 +223,9 @@ function format(object)
         if folded then
             table.remove(r)
         end
-
         table.insert(r, folded and " }" or "}")
 
         return r
-    end
-
-    return Fmt.new(function()
-        return fmt(true)
-    end, function()
-        return fmt(false)
     end)
 end
 
