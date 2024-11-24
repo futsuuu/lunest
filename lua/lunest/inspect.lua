@@ -7,17 +7,11 @@ local INDENT = "  "
 
 ---@generic T: table
 ---@param t T
----@param dst table?
----@param opts { metatable: boolean? }?
 ---@return T
-local function copy(t, dst, opts)
-    opts = opts or {}
-    local r = dst or {}
-    for key, value in pairs(t) do
-        r[key] = value
-    end
-    if opts.metatable ~= false then
-        setmetatable(r, getmetatable(t))
+local function copy(t)
+    local r = {}
+    for k, v in pairs(t) do
+        r[k] = v
     end
     return r
 end
@@ -86,71 +80,17 @@ do
     end
 end
 
----@class lunest.inspect.Context
----@field current_path any[]
----@field path_by_ref table<any, any[]>
-local Context = {}
----@private
-Context.__index = Context
-
----@return self
-function Context.new()
-    ---@type lunest.inspect.Context
-    local self = {
-        current_path = {},
-        path_by_ref = {},
-    }
-    return setmetatable(self, Context)
-end
-
----@return self
-function Context:snapshot()
-    ---@type lunest.inspect.Context
-    return {
-        current_path = copy(self.current_path),
-        path_by_ref = copy(self.path_by_ref),
-    }
-end
-
----@param snapshot self
-function Context:reset(snapshot)
-    copy(snapshot, self, { metatable = false })
-end
-
----@generic F: function
----@param snapshot self
----@param f F
----@return F
-function Context:with_reset(snapshot, f)
-    return function(...)
-        self:reset(snapshot)
-        return f(...)
-    end
-end
-
----@param obj any
----@return boolean
-function Context:is_new_reference(obj)
-    if self.path_by_ref[obj] then
-        return false
-    end
-    self.path_by_ref[obj] = copy(self.current_path)
-    return true
-end
-
-local inspect
+local format
 
 ---@param object any
----@param cx lunest.inspect.Context?
 ---@return lunest.inspect.Fmt
 ---@return boolean raw
-local function table_key(object, cx)
-    cx = cx or Context.new()
+local function table_key(object)
     if type(object) == "string" and not is_keyword(object) and object:match("^[_%a][_%w]*$") then
         return Fmt.str(object), true
     else
         return Fmt.new(function()
-            return { "[", inspect(object, cx), "]" }
+            return { "[", format(object), "]" }
         end),
             false
     end
@@ -163,11 +103,7 @@ test.test("table_key", function()
 end)
 
 ---@param path any[]
----@param cx lunest.inspect.Context?
----@return lunest.inspect.Fmt
-local function display_path(path, cx)
-    cx = cx or Context.new()
-
+local function display_path(path)
     ---@param folded boolean
     ---@return (string | lunest.inspect.Fmt)[]
     local function fmt(folded)
@@ -176,7 +112,7 @@ local function display_path(path, cx)
             if not folded then
                 table.insert(r, "\n" .. INDENT)
             end
-            local key, raw = table_key(obj, cx)
+            local key, raw = table_key(obj)
             if raw then
                 table.insert(r, ".")
             end
@@ -185,14 +121,11 @@ local function display_path(path, cx)
         return r
     end
 
-    return Fmt.new(
-        function()
-            return fmt(true)
-        end,
-        cx:with_reset(cx:snapshot(), function()
-            return fmt(false)
-        end)
-    )
+    return Fmt.new(function()
+        return fmt(true)
+    end, function()
+        return fmt(false)
+    end)
 end
 
 test.test("display_path", function()
@@ -209,107 +142,125 @@ test.test("display_path", function()
   ._]] == display_path({ 0, "hello", "world", "!", "_" }):tostring(27))
 end)
 
----@param object any
----@param cx lunest.inspect.Context?
----@return lunest.inspect.Fmt
-function inspect(object, cx)
-    cx = cx or Context.new()
+local path_mt = {}
 
+---@param obj any
+---@param current_path? any[]
+---@param path_by_ref? table<any, any[]>
+---@return any
+local function transform(obj, current_path, path_by_ref)
+    current_path, path_by_ref = current_path or {}, path_by_ref or {}
+    if path_by_ref[obj] then
+        return path_by_ref[obj]
+    end
+    local ty = type(obj)
+    if ty == "table" or ty == "function" or ty == "thread" or ty == "userdata" then
+        path_by_ref[obj] = setmetatable(copy(current_path), path_mt)
+    end
+    if ty ~= "table" then
+        return obj
+    end
+    ---@type { key: any, value: any }[]
+    local list = {}
+    for key, value in pairs(obj) do
+        table.insert(list, { key = key, value = value })
+    end
+    sort(list, function(e)
+        return e.key
+    end)
+    for _, e in ipairs(list) do
+        local key = transform(e.key, {}, setmetatable({}, { __index = path_by_ref }))
+        table.insert(current_path, key)
+        local value = transform(e.value, current_path, path_by_ref)
+        table.remove(current_path)
+        e.key, e.value = key, value
+    end
+    return setmetatable(list, getmetatable(obj))
+end
+
+---@param object any
+---@return lunest.inspect.Fmt
+function format(object)
     local ty = type(object)
 
     if ty == "nil" or ty == "boolean" or ty == "number" then
         return Fmt.str(tostring(object))
     elseif ty == "string" then
         return Fmt.str((("%q"):format(object):gsub("\\\n", "\\n")))
-    end
-
-    if not cx:is_new_reference(object) then
-        return display_path(cx.path_by_ref[object], cx)
-    end
-
-    if ty == "table" then
-        if not next(object) then
-            return Fmt.str("{}")
-        end
-
-        ---@type { key: any, value: any }[]
-        local list = {}
-        for key, value in pairs(object) do
-            table.insert(list, { key = key, value = value })
-        end
-        sort(list, function(e)
-            return e.key
-        end)
-
-        ---@param folded boolean
-        ---@return (string | lunest.inspect.Fmt)[]
-        local function fmt(folded)
-            ---@type (string | lunest.inspect.Fmt)[]
-            local r = { folded and "{ " or "{\n" }
-
-            local prev_key = nil
-            for _, e in ipairs(list) do
-                if not folded then
-                    table.insert(r, INDENT)
-                end
-                if
-                    (type(prev_key) == "number" or prev_key == nil)
-                    and e.key == (prev_key or 0) + 1
-                then
-                    prev_key = e.key
-                else
-                    prev_key = nil
-                    table.insert(r, (table_key(e.key, cx)))
-                    table.insert(r, " = ")
-                end
-                table.insert(cx.current_path, e.key)
-                table.insert(r, inspect(e.value, cx))
-                table.remove(cx.current_path)
-                table.insert(r, folded and ", " or ",\n")
-            end
-            if folded then
-                table.remove(r)
-            end
-
-            table.insert(r, folded and " }" or "}")
-
-            return r
-        end
-
-        return Fmt.new(
-            function()
-                return fmt(true)
-            end,
-            cx:with_reset(cx:snapshot(), function()
-                return fmt(false)
-            end)
-        )
-    end
-
-    if ty == "function" then
+    elseif ty == "function" then
         local info = debug.getinfo(object, "S")
-        if info.what == "Lua" and info.short_src ~= "" then
-            local s = info.short_src
-            if 0 < (info.linedefined or 0) then
-                s = s .. ":" .. info.linedefined
-            end
-            return Fmt.str(("(func %q)"):format(s))
-        else
+        if info.what ~= "Lua" or info.short_src == "" then
             return Fmt.str(("(func %q)"):format(info.what))
         end
+        local s = info.short_src
+        if 0 < (info.linedefined or 0) then
+            s = s .. ":" .. info.linedefined
+        end
+        return Fmt.str(("(func %q)"):format(s))
+    elseif ty ~= "table" then
+        return Fmt.str(("(%s)"):format(ty))
     end
 
-    return Fmt.str(("(%s)"):format(ty))
+    if getmetatable(object) == path_mt then
+        return display_path(object)
+    end
+    ---@cast object { key: any, value: any }[]
+    if not next(object) then
+        return Fmt.str("{}")
+    end
+
+    ---@param folded boolean
+    ---@return (string | lunest.inspect.Fmt)[]
+    local function fmt(folded)
+        ---@type (string | lunest.inspect.Fmt)[]
+        local r = { folded and "{ " or "{\n" }
+
+        local prev_key = nil
+        for _, e in ipairs(object) do
+            if not folded then
+                table.insert(r, INDENT)
+            end
+            if (type(prev_key) == "number" or prev_key == nil) and e.key == (prev_key or 0) + 1 then
+                prev_key = e.key
+            else
+                prev_key = nil
+                table.insert(r, (table_key(e.key)))
+                table.insert(r, " = ")
+            end
+            table.insert(r, format(e.value))
+            table.insert(r, folded and ", " or ",\n")
+        end
+        if folded then
+            table.remove(r)
+        end
+
+        table.insert(r, folded and " }" or "}")
+
+        return r
+    end
+
+    return Fmt.new(function()
+        return fmt(true)
+    end, function()
+        return fmt(false)
+    end)
+end
+
+---@param obj any
+---@param max_width integer?
+---@return string
+local function inspect(obj, max_width)
+    return format(transform(obj)):tostring(max_width)
 end
 
 test.test("empty table", function()
-    assert("{}" == inspect({}):tostring())
+    assert("{}" == inspect({}))
 end)
 
 test.test("list", function()
     assert(
         '{ [0] = "x", "a", "b", [4] = "d", [5] = "e" }'
-            == inspect({ [0] = "x", "a", "b", nil, "d", "e" }):tostring()
+            == inspect({ [0] = "x", "a", "b", nil, "d", "e" })
     )
 end)
 
@@ -317,17 +268,14 @@ test.test("recursive", function()
     local t = {}
     t.M = {}
     t.M.__index = t.M
-    assert("{ M = { __index = (root).M } }" == inspect(t):tostring())
+    assert("{ M = { __index = (root).M } }" == inspect(t))
 end)
 
 test.test("reference", function()
     local t = { a = { b = {} } }
     t.b = t.a.b
-    assert("{ a = { b = {} }, b = (root).a.b }" == inspect(t):tostring())
+    assert("{ a = { b = {} }, b = (root).a.b }" == inspect(t))
 end)
--- local t = { a = { b = {} } }
--- t.b = t.a.b
--- print(inspect(t):tostring())
 
 test.test("expand key", function()
     assert([[
@@ -336,11 +284,9 @@ test.test("expand key", function()
     a = 1,
     b = 2,
   }] = true,
-}]] == inspect({ [{ a = 1, b = 2 }] = true }):tostring(12))
+}]] == inspect({ [{ a = 1, b = 2 }] = true }, 12))
 end)
 
--- print(inspect(_G):tostring(157))
-
 return function(obj)
-    return inspect(obj):tostring(80)
+    return inspect(obj, 80)
 end
