@@ -1,5 +1,6 @@
 ---@class lunest.assertion
 local M = {}
+package.loaded[...] = M
 
 local test = require("lunest.wrapper")
 
@@ -103,8 +104,8 @@ function M.eq(left, right)
     if not equal(left, right) then
         error(
             "two values are not equal\n"
-                .. (" left: %s\n"):format(inspect(left))
-                .. ("right: %s"):format(inspect(right))
+                .. (" left: %s\n"):format(inspect.inspect(left))
+                .. ("right: %s"):format(inspect.inspect(right))
         )
     end
 end
