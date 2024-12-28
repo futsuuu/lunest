@@ -46,7 +46,7 @@ fn main() -> Result<()> {
 fn run_cmd(profile: Option<String>) -> Result<()> {
     let root_dir = env::current_dir()?;
     let temp_dir = {
-        let dir = env::temp_dir().join("lunest");
+        let dir = env::temp_dir().join(format!("lunest{:X}", process::id()));
         if dir.try_exists()? {
             fs::remove_dir_all(&dir)?;
             fs::create_dir(&dir)?;
