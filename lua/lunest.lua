@@ -3,8 +3,11 @@ local M = {}
 
 local Group = require("lunest.Group")
 local Test = require("lunest.Test")
+local assertion = require("lunest.assertion")
 local bridge = require("lunest.bridge")
 local module = require("lunest.module")
+
+M.assertion = assertion
 
 ---@param name string
 ---@param func fun()

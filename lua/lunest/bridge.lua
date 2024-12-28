@@ -8,6 +8,8 @@ local TARGET_FILES
 local MSG_FILE
 ---@type string?
 local INIT_FILE
+---@type integer
+local TERM_WIDTH
 
 ---@class lunest.bridge.Message
 ---@field TestStarted? lunest.bridge.TestStarted
@@ -22,6 +24,7 @@ local INIT_FILE
 
 ---@class lunest.bridge.TestError
 ---@field Msg? string
+---@field Diff? { msg: string, left: string, right: string }
 
 function M.root_dir()
     return ROOT_DIR
@@ -35,6 +38,11 @@ end
 ---@return string?
 function M.get_init_file()
     return INIT_FILE
+end
+
+---@return integer
+function M.get_term_width()
+    return TERM_WIDTH
 end
 
 local null = {}
@@ -79,6 +87,12 @@ local function json_encode(obj)
     end
 end
 
+local ERROR_MT = {}
+---@param err lunest.bridge.TestError
+function M.error(err)
+    error(setmetatable(err, ERROR_MT))
+end
+
 ---@type file*
 local msg_file
 
@@ -99,14 +113,21 @@ function M.start_test(title)
 end
 
 ---@param title string[]
----@param err string?
+---@param err any | lunest.bridge.TestError
 function M.finish_test(title, err)
     ---@type lunest.bridge.Message
     local msg = {
         TestFinished = { title = title },
     }
     if err then
-        msg.TestFinished.error = { Msg = err }
+        if getmetatable(err) ~= ERROR_MT then
+            ---@type lunest.bridge.TestError
+            err = {
+                Msg = err and tostring(err) or "(error occurred without message)",
+            }
+        end
+        ---@cast err lunest.bridge.TestError
+        msg.TestFinished.error = err
     end
     write_msg(msg)
 end

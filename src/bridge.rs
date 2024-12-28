@@ -12,24 +12,33 @@ use serde::Deserialize;
 pub struct Bridge {
     path: PathBuf,
     reader: BufReader<fs::File>,
+    line: String,
 }
 
 impl Bridge {
     pub fn new(temp_dir: &Path) -> Result<Self> {
-        let path = temp_dir.join("messages");
+        let path = temp_dir.join("messages.jsonl");
         fs::write(&path, "")?;
         let reader = BufReader::new(fs::File::open(&path)?);
-        Ok(Self { path, reader })
+        Ok(Self {
+            path,
+            reader,
+            line: String::new(),
+        })
     }
 
     pub fn read(&mut self) -> Result<Option<Message>> {
-        let mut line = String::new();
-        if self.reader.read_line(&mut line)? == 0 {
-            return Ok(None);
+        while !self.line.ends_with('\n') {
+            if self.reader.read_line(&mut self.line)? == 0 {
+                return Ok(None);
+            }
         }
-        let line = line.trim();
-        let msg: Message = serde_json::from_str(line)
-            .with_context(|| format!("failed to deserialize json: {line}"))?;
+        let msg: Message = {
+            let line = self.line.trim_end_matches('\n');
+            serde_json::from_str(line)
+                .with_context(|| format!("failed to deserialize json: {line}"))?
+        };
+        self.line.clear();
         Ok(Some(msg))
     }
 
@@ -68,6 +77,13 @@ impl Bridge {
                     "local MSG_FILE = \"{}\"\n",
                     self.path.display().to_string().replace('\\', r"\\")
                 ),
+            )
+            .replace(
+                "local TERM_WIDTH\n",
+                &format!(
+                    "local TERM_WIDTH = {}\n",
+                    crossterm::terminal::size().map_or(60, |size| size.0),
+                ),
             );
         if let Some(path) = init_file {
             contents.replace(
@@ -84,7 +100,7 @@ impl Bridge {
 }
 
 fn fmt_title(title: &[String]) -> String {
-    title.join(&" :: ".dim().to_string())
+    title.join(&" :: ".grey().to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,7 +120,7 @@ impl fmt::Display for TestStarted {
             f,
             "{}{} {}",
             fmt_title(&self.title),
-            ":".dim(),
+            ":".grey(),
             "RUNNING".cyan().bold()
         )
     }
@@ -125,7 +141,7 @@ impl TestFinished {
 impl fmt::Display for TestFinished {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", terminal::Clear(terminal::ClearType::UntilNewLine))?;
-        write!(f, "{}{} ", fmt_title(&self.title), ":".dim())?;
+        write!(f, "{}{} ", fmt_title(&self.title), ":".grey())?;
         if let Some(err) = &self.error {
             write!(f, "{}\n{}", "ERR".red().bold(), err)
         } else {
@@ -137,12 +153,47 @@ impl fmt::Display for TestFinished {
 #[derive(Debug, Deserialize)]
 pub enum TestError {
     Msg(String),
+    Diff {
+        msg: String,
+        left: String,
+        right: String,
+    },
 }
 
 impl fmt::Display for TestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            TestError::Msg(msg) => write!(f, "{msg}"),
+            TestError::Msg(msg) => {
+                writeln!(f, "{}", msg.as_str().bold())?;
+            }
+            TestError::Diff { msg, left, right } => {
+                writeln!(f, "{}", msg.as_str().bold())?;
+                writeln!(f)?;
+                writeln!(
+                    f,
+                    "{} ({} {} {}):",
+                    " difference".bold(),
+                    "-left".red(),
+                    "/".grey(),
+                    "+right".green()
+                )?;
+                let delete = "-".red();
+                let insert = "+".green();
+                let diff = similar::TextDiff::from_lines(left, right);
+                for change in diff.iter_all_changes() {
+                    let line = change.value();
+                    use similar::ChangeTag::*;
+                    match change.tag() {
+                        Equal => write!(f, " {}", line.grey())?,
+                        Delete => write!(f, "{delete}{}", line.red())?,
+                        Insert => write!(f, "{insert}{}", line.green())?,
+                    }
+                    if !line.ends_with('\n') {
+                        writeln!(f)?;
+                    }
+                }
+            }
         }
+        Ok(())
     }
 }

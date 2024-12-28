@@ -14,13 +14,11 @@ M.__index = M
 ---@param source string
 ---@return self
 function M.new(name, source)
-    ---@type lunest.Test
-    local self = {
-        name = name,
-        source = source,
-        parent = assert(Group.current()),
-    }
-    return setmetatable(self, M)
+    local self = setmetatable({}, M)
+    self.name = name
+    self.source = source
+    self.parent = assert(Group.current())
+    return self
 end
 
 ---@param func fun()
@@ -41,14 +39,10 @@ function M:wrap(func)
     local title = self:get_title()
     return function()
         bridge.start_test(title)
-
         local success, err = pcall(func)
         if success then
             err = nil
-        else
-            err = err and tostring(err) or "error occurred without message"
         end
-
         bridge.finish_test(title, err)
     end
 end

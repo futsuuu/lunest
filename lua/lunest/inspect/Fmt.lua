@@ -7,8 +7,7 @@ local M = {}
 package.loaded[...] = M
 
 local test = require("lunest.wrapper")
-
-local assertion = require("lunest.assertion")
+local assertion = test.assertion
 
 ---@enum lunest.inspect.Fmt.Sequence
 local Sequence = {

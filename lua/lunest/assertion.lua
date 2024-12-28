@@ -1,9 +1,9 @@
----@class lunest.assertion
 local M = {}
 package.loaded[...] = M
 
 local test = require("lunest.wrapper")
 
+local bridge = require("lunest.bridge")
 local inspect = require("lunest.inspect")
 
 ---@param left any
@@ -101,12 +101,15 @@ end)
 ---@param left any
 ---@param right any
 function M.eq(left, right)
+    local inspect_width = bridge.get_term_width() - 1 -- consider diff sign character
     if not equal(left, right) then
-        error(
-            "two values are not equal\n"
-                .. (" left: %s\n"):format(inspect.inspect(left))
-                .. ("right: %s"):format(inspect.inspect(right))
-        )
+        bridge.error({
+            Diff = {
+                msg = "two values are not equal",
+                left = inspect.inspect(left, inspect_width),
+                right = inspect.inspect(right, inspect_width),
+            },
+        })
     end
 end
 

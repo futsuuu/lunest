@@ -20,14 +20,11 @@ M.__index = M
 ---@param source string
 ---@return self
 function M.new(name, source)
-    ---@type lunest.Group
-    local self = {
-        name = name,
-        source = source,
-        parent = current,
-        deferred = {},
-    }
-    setmetatable(self, M)
+    local self = setmetatable({}, M)
+    self.name = name
+    self.source = source
+    self.parent = current
+    self.deferred = {}
     if self.parent and self.parent:is_toplevel() then
         self.parent:defer(function()
             current = self
