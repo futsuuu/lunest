@@ -151,28 +151,37 @@ impl fmt::Display for TestFinished {
 }
 
 #[derive(Debug, Deserialize)]
-pub enum TestError {
-    Msg(String),
-    Diff {
-        msg: String,
-        left: String,
-        right: String,
-    },
+pub struct TestError {
+    message: String,
+    traceback: String,
+    info: Option<TestErrorInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum TestErrorInfo {
+    Diff { left: String, right: String },
 }
 
 impl fmt::Display for TestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}\n", self.message.as_str().bold())?;
+        if let Some(info) = &self.info {
+            writeln!(f, "{info}")?;
+        }
+        writeln!(f, "{}:", "  stack traceback".bold())?;
+        writeln!(f, "{}", self.traceback)?;
+        Ok(())
+    }
+}
+
+impl fmt::Display for TestErrorInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            TestError::Msg(msg) => {
-                writeln!(f, "{}", msg.as_str().bold())?;
-            }
-            TestError::Diff { msg, left, right } => {
-                writeln!(f, "{}", msg.as_str().bold())?;
-                writeln!(f)?;
+            TestErrorInfo::Diff { left, right } => {
                 writeln!(
                     f,
                     "{} ({} {} {}):",
-                    " difference".bold(),
+                    "  difference".bold(),
                     "-left".red(),
                     "/".grey(),
                     "+right".green()

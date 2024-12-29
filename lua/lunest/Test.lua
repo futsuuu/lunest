@@ -34,12 +34,79 @@ function M:run(func)
     end
 end
 
+---@param func function
+local function test_runner(func)
+    ---@param ___ function
+    local function ___LUNEST_TRACEBACK_MARKER(___)
+        local r = ___()
+        return r -- avoid tail call
+    end
+    return function()
+        local r = ___LUNEST_TRACEBACK_MARKER(func)
+        return r
+    end
+end
+
+---@param level integer?
+---@return string
+local function traceback(level)
+    level = level or 1
+    return (
+        debug
+            .traceback("", level + 1)
+            :gsub("^\nstack traceback:\n\t", "")
+            :gsub("\n\t", "\n")
+            :gsub("\n[^\n]*___LUNEST_TRACEBACK_MARKER.*", "")
+    )
+end
+
+local error_mt = {}
+
+---@param msg string
+---@param info lunest.bridge.TestErrorInfo?
+---@param level integer?
+function M.error(msg, info, level)
+    level = level or 1
+    local debuginfo = debug.getinfo(level + 2, "Sl")
+    if debuginfo.short_src then
+        local src = debuginfo.short_src
+        if debuginfo.currentline then
+            src = src .. ":" .. debuginfo.currentline
+        end
+        msg = src .. ": " .. msg
+    end
+    ---@type lunest.bridge.TestError
+    local err = {
+        message = msg,
+        traceback = traceback(level + 1),
+        info = info,
+    }
+    error(setmetatable(err, error_mt))
+end
+
+---@param err any
+---@param level integer?
+local function handle_error(err, level)
+    level = level or 1
+    if getmetatable(err) == error_mt then
+        return err
+    end
+    if err == nil then
+        err = "(error occurred without message)"
+    end
+    ---@type lunest.bridge.TestError
+    return {
+        message = tostring(err),
+        traceback = traceback(level + 1),
+    }
+end
+
 ---@param func fun()
 function M:wrap(func)
     local title = self:get_title()
     return function()
         bridge.start_test(title)
-        local success, err = pcall(func)
+        local success, err = xpcall(test_runner(func), handle_error)
         if success then
             err = nil
         end

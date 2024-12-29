@@ -3,6 +3,7 @@ package.loaded[...] = M
 
 local test = require("lunest.wrapper")
 
+local Test = require("lunest.Test")
 local bridge = require("lunest.bridge")
 local inspect = require("lunest.inspect")
 
@@ -103,9 +104,8 @@ end)
 function M.eq(left, right)
     local inspect_width = bridge.get_term_width() - 1 -- consider diff sign character
     if not equal(left, right) then
-        bridge.error({
+        Test.error("two values are not equal", {
             Diff = {
-                msg = "two values are not equal",
                 left = inspect.inspect(left, inspect_width),
                 right = inspect.inspect(right, inspect_width),
             },
@@ -116,7 +116,9 @@ end
 ---@param left any
 ---@param right any
 function M.ne(left, right)
-    assert(not equal(left, right))
+    if equal(left, right) then
+        Test.error("two values are equal")
+    end
 end
 
 return M
