@@ -29,4 +29,4 @@ toml = { version = "0.8", default-features = false, features = ["parse"] }
 walkdir.workspace = true
 
 [build-dependencies]
-bundler = { path = "./bundler" }
+bundler = { path = "./bundler", features = ["build-script"] }

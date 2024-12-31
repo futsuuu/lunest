@@ -3,7 +3,6 @@ use std::{ffi::OsStr, fs, path::Path};
 #[derive(Default)]
 pub struct Bundler {
     modules: Vec<Module>,
-    entry_point: Option<String>,
     publics: Vec<String>,
 }
 
@@ -12,17 +11,24 @@ impl Bundler {
         Self::default()
     }
 
-    pub fn modules(&mut self, module_root_file: impl AsRef<Path>) -> std::io::Result<&mut Self> {
+    pub fn add_modules(
+        &mut self,
+        module_root_file: impl AsRef<Path>,
+    ) -> std::io::Result<&mut Self> {
         let module_root_file = module_root_file.as_ref();
         let module_dir = if module_root_file.file_name().unwrap() == OsStr::new("init.lua") {
             module_root_file.parent().unwrap().to_path_buf()
         } else {
+            #[cfg(feature = "build-script")]
+            println!("cargo::rerun-if-changed={}", module_root_file.display());
             module_root_file.with_extension("")
         };
 
         self.modules
             .push(Module::new(module_dir.parent().unwrap(), module_root_file)?);
         if module_dir.exists() {
+            #[cfg(feature = "build-script")]
+            println!("cargo::rerun-if-changed={}", module_dir.display());
             for entry in walkdir::WalkDir::new(&module_dir) {
                 let entry = entry?;
                 let path = entry.path();
@@ -39,17 +45,12 @@ impl Bundler {
         Ok(self)
     }
 
-    pub fn public(&mut self, module_name: &str) -> &mut Self {
+    pub fn make_public(&mut self, module_name: impl Into<String>) -> &mut Self {
         self.publics.push(module_name.into());
         self
     }
 
-    pub fn entry_point(&mut self, module_name: &str) -> &mut Self {
-        self.entry_point = Some(module_name.into());
-        self
-    }
-
-    pub fn bundle(&self) -> String {
+    pub fn bundle(&self, default_module: Option<impl AsRef<str>>) -> String {
         let mut result = include_str!("./override.lua").replace(
             "local PUBLIC_MODULES\n",
             &format!(
@@ -64,8 +65,8 @@ impl Bundler {
         for module in &self.modules {
             result += &module.setup_loader();
         }
-        if let Some(entry_point) = &self.entry_point {
-            result += &format!("return require('{entry_point}')\n");
+        if let Some(m) = default_module {
+            result += &format!("return require('{}')\n", m.as_ref());
         }
         result
     }
