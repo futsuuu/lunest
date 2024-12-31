@@ -1,5 +1,7 @@
 local M = {}
 
+local json = require("json")
+
 do
     ---@type string
     local ROOT_DIR
@@ -31,49 +33,6 @@ do
     ---@return integer
     function M.get_term_width()
         return TERM_WIDTH
-    end
-end
-
-local json = {}
-do
-    ---@param obj any
-    ---@return string
-    local function format_q(obj)
-        return (
-            ("%q")
-                :format(obj)
-                :gsub("\\\n", [[\n]])
-                :gsub([[([^\])\8]], [[%1\b]])
-                :gsub([[([^\])\9]], [[%1\t]])
-                :gsub([[([^\])\12]], [[%1\f]])
-                :gsub([[([^\])\13]], [[%1\r]])
-        )
-    end
-
-    ---@return string
-    function json.encode(obj)
-        local t = type(obj)
-        if t == "nil" then
-            return "null"
-        elseif t == "number" or t == "boolean" then
-            return tostring(obj)
-        elseif t == "string" then
-            return format_q(obj)
-        elseif t ~= "table" then
-            error(("invalid type '%s'"):format(t))
-        elseif obj[1] then
-            local ss = {}
-            for _, value in ipairs(obj) do
-                table.insert(ss, json.encode(value))
-            end
-            return "[" .. table.concat(ss, ",") .. "]"
-        else
-            local ss = {}
-            for key, value in pairs(obj) do
-                table.insert(ss, format_q(key) .. ":" .. json.encode(value))
-            end
-            return "{" .. table.concat(ss, ",") .. "}"
-        end
     end
 end
 
