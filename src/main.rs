@@ -22,8 +22,8 @@ enum Args {
     #[command(visible_alias = "r")]
     Run {
         /// Run tests with the specified profile
-        #[arg(long, short)]
-        profile: Option<String>,
+        #[arg(long, short, value_delimiter = ',')]
+        profile: Vec<String>,
     },
 
     /// Print wrapper Lua code used for in-source testing
@@ -43,7 +43,20 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_cmd(profile: Option<String>) -> Result<()> {
+fn run_cmd(profiles: Vec<String>) -> Result<()> {
+    if profiles.is_empty() {
+        return run(None);
+    }
+    for (i, profile) in profiles.into_iter().enumerate() {
+        if i != 0 {
+            println!();
+        }
+        run(Some(profile))?;
+    }
+    Ok(())
+}
+
+fn run(profile: Option<String>) -> Result<()> {
     let root_dir = env::current_dir()?;
     let temp_dir = {
         let dir = env::temp_dir().join(format!("lunest{:X}", process::id()));
