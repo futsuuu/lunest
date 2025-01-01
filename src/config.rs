@@ -4,30 +4,11 @@ use anyhow::{Context, Result};
 use merge::Merge;
 use serde::Deserialize;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Config {
     group: std::collections::HashMap<String, Vec<String>>,
     profile: std::collections::HashMap<String, Profile>,
-}
-
-#[derive(Clone, Debug, Deserialize, Merge)]
-pub struct Profile {
-    lua: Option<Vec<String>>,
-    include: Option<Vec<String>>,
-    exclude: Option<Vec<String>>,
-    init: Option<PathBuf>,
-}
-
-impl Default for Profile {
-    fn default() -> Self {
-        Self {
-            lua: Some(vec!["lua".into()]),
-            include: Some(vec!["{src,lua}/**/*.lua".into()]),
-            exclude: Some(vec![]),
-            init: None,
-        }
-    }
 }
 
 impl Config {
@@ -43,24 +24,6 @@ impl Config {
             Self::default()
         };
         Ok(config)
-    }
-
-    pub fn group(&self, name: &str) -> Result<indexmap::IndexMap<&str, Profile>> {
-        let mut profiles = indexmap::IndexMap::new();
-        for member in self
-            .group
-            .get(name)
-            .with_context(|| format!("group '{name}' is not defined"))?
-        {
-            if let Ok((s, p)) = self.profile(Some(member)) {
-                profiles.insert(s, p);
-            } else if let Ok(ps) = self.group(member) {
-                profiles.extend(ps);
-            } else {
-                anyhow::bail!("profile or group '{name}' is not defined");
-            }
-        }
-        Ok(profiles)
     }
 
     pub fn profile<'a>(&'a self, name: Option<&'a str>) -> Result<(&'a str, Profile)> {
@@ -91,6 +54,134 @@ impl Config {
         profile.merge(Profile::default());
 
         Ok((name, profile))
+    }
+
+    pub fn group<'a>(&'a self, name: &'a str) -> Result<indexmap::IndexMap<&'a str, Profile>> {
+        let mut profiles = indexmap::IndexMap::new();
+        self.group_inner(name, &mut profiles, &mut std::collections::HashSet::new())?;
+        Ok(profiles)
+    }
+
+    fn group_inner<'a>(
+        &'a self,
+        name: &'a str,
+        profiles: &mut indexmap::IndexMap<&'a str, Profile>,
+        visited_groups: &mut std::collections::HashSet<&'a str>,
+    ) -> Result<()> {
+        let members = self
+            .group
+            .get(name)
+            .with_context(|| format!("group '{name}' is not defined"))?;
+        if !visited_groups.insert(name) {
+            return Ok(());
+        }
+        for member in members {
+            if let Ok((s, p)) = self.profile(Some(member)) {
+                profiles.insert(s, p);
+            } else if self.group_inner(member, profiles, visited_groups).is_err() {
+                anyhow::bail!("profile or group '{member}' is not defined");
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    #[test]
+    fn use_default_profile_if_empty() {
+        let c: Config = toml::from_str("").unwrap();
+        assert_eq!(("default", Profile::default()), c.profile(None).unwrap());
+    }
+
+    #[test]
+    fn detect_profile_from_one_profile() {
+        let c: Config = toml::from_str(
+            "[profile.a]
+            init = 'a.lua'",
+        )
+        .unwrap();
+        let (s, p) = c.profile(None).unwrap();
+        assert_eq!(s, "a");
+        assert_eq!(
+            p,
+            Profile {
+                init: Some(PathBuf::from("a.lua")),
+                ..Default::default()
+            },
+        );
+    }
+
+    #[test]
+    fn detect_profile_from_multiple_profiles() {
+        let c: Config = toml::from_str(
+            "[profile.a]
+            [profile.b]",
+        )
+        .unwrap();
+        assert!(c.profile(None).is_err());
+    }
+
+    #[test]
+    fn merge_default_profile() {
+        let c: Config = toml::from_str(
+            "[profile.default]
+            init = 'a.lua'
+            lua = ['lua']
+            [profile.a]
+            lua = ['lua5.1']",
+        )
+        .unwrap();
+        let (s, p) = c.profile(Some("a")).unwrap();
+        assert_eq!(s, "a");
+        assert_eq!(
+            p,
+            Profile {
+                init: Some(PathBuf::from("a.lua")),
+                lua: Some(vec!["lua5.1".into()]),
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn get_profiles_from_circular_referenced_group() {
+        let c: Config = toml::from_str(
+            "[group]
+            a = ['b', 'd']
+            b = ['a', 'c']
+            [profile.c]
+            [profile.d]",
+        )
+        .unwrap();
+        assert_eq!(
+            indexmap::indexmap! {
+                "c" => Profile::default(),
+                "d" => Profile::default(),
+            },
+            c.group("a").unwrap(),
+        );
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Merge, PartialEq)]
+pub struct Profile {
+    lua: Option<Vec<String>>,
+    include: Option<Vec<String>>,
+    exclude: Option<Vec<String>>,
+    init: Option<PathBuf>,
+}
+
+impl Default for Profile {
+    fn default() -> Self {
+        Self {
+            lua: Some(vec!["lua".into()]),
+            include: Some(vec!["{src,lua}/**/*.lua".into()]),
+            exclude: Some(vec![]),
+            init: None,
+        }
     }
 }
 
