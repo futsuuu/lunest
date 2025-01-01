@@ -44,8 +44,6 @@ fn main() -> Result<()> {
 
 fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> Result<()> {
     let root_dir = std::env::current_dir()?;
-    let temp_dir = std::env::temp_dir().join(format!("lunest{:X}", std::process::id()));
-
     let config = config::Config::read(&root_dir)?;
     let profiles = {
         let mut ps = indexmap::IndexMap::new();
@@ -64,11 +62,11 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> Result<()> {
     };
 
     let mut has_error = false;
-    for (i, (profile_name, profile)) in profiles.into_iter().enumerate() {
+    for (i, (profile_name, profile)) in profiles.iter().enumerate() {
         if i != 0 {
             println!();
         }
-        if !run(profile_name, profile, &root_dir, &temp_dir)? {
+        if !run(profile_name, profile, &root_dir)? {
             has_error = true;
         }
     }
@@ -78,23 +76,13 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-fn run(
-    profile_name: &str,
-    profile: config::Profile,
-    root_dir: &Path,
-    temp_dir: &Path,
-) -> Result<bool> {
+fn run(profile_name: &str, profile: &config::Profile, root_dir: &Path) -> Result<bool> {
     println!("run with profile '{}'\n", profile_name.bold());
 
-    if temp_dir.try_exists()? {
-        std::fs::remove_dir_all(temp_dir)?;
-        std::fs::create_dir(temp_dir)?;
-    } else {
-        std::fs::create_dir_all(temp_dir)?;
-    }
-    let mut bridge = bridge::Bridge::new(temp_dir)?;
+    let temp_dir = tempfile::TempDir::with_prefix(env!("CARGO_CRATE_NAME"))?;
+    let mut bridge = bridge::Bridge::new(temp_dir.path())?;
     let mut process = {
-        let main_lua = temp_dir.join("main.lua");
+        let main_lua = temp_dir.path().join("main.lua");
         std::fs::write(
             &main_lua,
             bridge.overwrite_main_lua(
@@ -136,8 +124,6 @@ fn run(
             }
         }
     }
-
-    std::fs::remove_dir_all(temp_dir)?;
 
     let (success, error): (Vec<_>, Vec<_>) = results.iter().partition(|r| r.success());
     println!(
