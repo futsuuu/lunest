@@ -1,3 +1,6 @@
+[group]
+all = ["default", "nvim"]
+
 [profile.default]
 lua = ["lua"]
 init = "test_init.lua"

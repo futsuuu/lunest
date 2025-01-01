@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    path::{Path, PathBuf},
-    process,
-};
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use merge::Merge;
@@ -12,7 +7,8 @@ use serde::Deserialize;
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    profile: HashMap<String, Profile>,
+    group: std::collections::HashMap<String, Vec<String>>,
+    profile: std::collections::HashMap<String, Profile>,
 }
 
 #[derive(Clone, Debug, Deserialize, Merge)]
@@ -41,12 +37,30 @@ impl Config {
             root_dir.join("lunest.toml"),
             root_dir.join(".lunest.toml"),
         ];
-        let config = if let Some(s) = paths.iter().find_map(|p| fs::read_to_string(p).ok()) {
+        let config = if let Some(s) = paths.iter().find_map(|p| std::fs::read_to_string(p).ok()) {
             toml::from_str(&s)?
         } else {
             Self::default()
         };
         Ok(config)
+    }
+
+    pub fn group(&self, name: &str) -> Result<indexmap::IndexMap<&str, Profile>> {
+        let mut profiles = indexmap::IndexMap::new();
+        for member in self
+            .group
+            .get(name)
+            .with_context(|| format!("group '{name}' is not defined"))?
+        {
+            if let Ok((s, p)) = self.profile(Some(member)) {
+                profiles.insert(s, p);
+            } else if let Ok(ps) = self.group(member) {
+                profiles.extend(ps);
+            } else {
+                anyhow::bail!("profile or group '{name}' is not defined");
+            }
+        }
+        Ok(profiles)
     }
 
     pub fn profile<'a>(&'a self, name: Option<&'a str>) -> Result<(&'a str, Profile)> {
@@ -81,9 +95,9 @@ impl Config {
 }
 
 impl Profile {
-    pub fn lua_command(&self) -> Result<process::Command> {
+    pub fn lua_command(&self) -> Result<std::process::Command> {
         let lua = self.lua.as_ref().unwrap();
-        let mut cmd = process::Command::new(lua.first().context("command is empty")?);
+        let mut cmd = std::process::Command::new(lua.first().context("command is empty")?);
         cmd.args(lua.get(1..).unwrap_or_default());
         Ok(cmd)
     }
