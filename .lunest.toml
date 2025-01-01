@@ -3,6 +3,7 @@ all = ["default", "nvim"]
 
 [profile.default]
 lua = ["lua"]
+include = ["module/**/*.lua"]
 init = "test_init.lua"
 
 [profile.nvim]
