@@ -1,5 +1,10 @@
 [workspace]
-members = ["bundler", "cli"]
+members = [
+    "bundler",
+    "cli",
+    "lua_cmd",
+    "lua_cmds",
+]
 default-members = ["cli"]
 resolver = "2"
 
@@ -9,3 +14,13 @@ edition = "2021"
 
 [workspace.dependencies]
 walkdir = "2.5"
+
+[profile.dev]
+codegen-units = 1024
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = "debuginfo"

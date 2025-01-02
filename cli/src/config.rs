@@ -186,9 +186,21 @@ impl Default for Profile {
 }
 
 impl Profile {
-    pub fn lua_command(&self) -> Result<std::process::Command> {
+    pub fn lua_command(&self, temp_dir: &Path) -> Result<std::process::Command> {
         let lua = self.lua.as_ref().unwrap();
-        let mut cmd = std::process::Command::new(lua.first().context("command is empty")?);
+        let first = lua.first().context("command is empty")?;
+        let mut cmd = match (
+            which::which(first),
+            lua_cmds::LuaCmd::from_program_name(first),
+        ) {
+            (Ok(p), _) => std::process::Command::new(p),
+            (Err(_), Some(lua_cmd)) => {
+                let p = temp_dir.join(lua_cmd.recommended_program_name());
+                lua_cmd.write(&p)?;
+                std::process::Command::new(p)
+            }
+            _ => std::process::Command::new(first),
+        };
         cmd.args(lua.get(1..).unwrap_or_default());
         Ok(cmd)
     }

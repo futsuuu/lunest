@@ -77,7 +77,7 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> Result<()> {
 }
 
 fn run(profile_name: &str, profile: &config::Profile, root_dir: &Path) -> Result<bool> {
-    println!("run with profile '{}'\n", profile_name.bold());
+    println!("run with profile '{}'", profile_name.bold());
 
     let temp_dir = tempfile::TempDir::with_prefix(env!("CARGO_CRATE_NAME"))?;
     let mut bridge = bridge::Bridge::new(temp_dir.path())?;
@@ -92,8 +92,9 @@ fn run(profile_name: &str, profile: &config::Profile, root_dir: &Path) -> Result
                 profile.init_file()?,
             ),
         )?;
-        let mut cmd = profile.lua_command()?;
+        let mut cmd = profile.lua_command(temp_dir.path())?;
         cmd.arg(&main_lua);
+        println!("spawn {}", display_command(&cmd));
         cmd.spawn().with_context(|| {
             format!(
                 "failed to spawn process `{}`",
@@ -103,6 +104,7 @@ fn run(profile_name: &str, profile: &config::Profile, root_dir: &Path) -> Result
     };
 
     let mut results = Vec::new();
+    println!();
 
     loop {
         if let Some(message) = bridge.read()? {
@@ -147,4 +149,23 @@ fn wrapper_cmd(save: Option<PathBuf>) -> Result<()> {
         print!("{}", source);
     }
     Ok(())
+}
+
+fn display_command(cmd: &std::process::Command) -> String {
+    fn fmt_osstr(s: &std::ffi::OsStr) -> String {
+        let s = s.to_str().unwrap_or("(invalid UTF-8)");
+        if s.contains(' ') {
+            let s = s.replace('"', "\\\"");
+            format!("\"{s}\"")
+        } else {
+            s.into()
+        }
+    }
+    let mut s = String::new();
+    s += &fmt_osstr(cmd.get_program()).cyan().to_string();
+    for a in cmd.get_args() {
+        s += " ";
+        s += &fmt_osstr(a).magenta().to_string();
+    }
+    s
 }
