@@ -4,54 +4,30 @@ use std::{
     path::Path,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum LuaCmd {
     #[cfg(feature = "lua51")]
+    #[cfg_attr(default_lua = "lua51", default)]
     Lua51,
     #[cfg(feature = "lua52")]
+    #[cfg_attr(default_lua = "lua52", default)]
     Lua52,
     #[cfg(feature = "lua53")]
+    #[cfg_attr(default_lua = "lua53", default)]
     Lua53,
     #[cfg(feature = "lua54")]
+    #[cfg_attr(default_lua = "lua54", default)]
     Lua54,
     #[cfg(feature = "luajit")]
+    #[cfg_attr(default_lua = "luajit", default)]
     LuaJIT,
-}
-
-#[cfg(any(
-    feature = "lua51",
-    feature = "lua52",
-    feature = "lua53",
-    feature = "lua54",
-    feature = "luajit",
-))]
-impl Default for LuaCmd {
-    fn default() -> Self {
-        #[cfg(feature = "lua54")]
-        return LuaCmd::Lua54;
-        #[cfg(all(feature = "lua53", not(feature = "lua54")))]
-        return LuaCmd::Lua53;
-        #[cfg(all(feature = "lua52", not(feature = "lua54"), not(feature = "lua53")))]
-        return LuaCmd::Lua52;
-        #[cfg(all(
-            feature = "lua51",
-            not(feature = "lua54"),
-            not(feature = "lua53"),
-            not(feature = "lua52"),
-        ))]
-        return LuaCmd::Lua51;
-        #[cfg(all(
-            feature = "luajit",
-            not(feature = "lua54"),
-            not(feature = "lua53"),
-            not(feature = "lua52"),
-            not(feature = "lua51"),
-        ))]
-        return LuaCmd::LuaJIT;
-    }
+    #[cfg(default_lua = "none")]
+    #[default]
+    None,
 }
 
 impl LuaCmd {
+    #[cfg(not(default_lua = "none"))]
     pub fn get_bytes(&self) -> &'static [u8] {
         use LuaCmd::*;
         match self {
@@ -68,6 +44,7 @@ impl LuaCmd {
         }
     }
 
+    #[cfg(not(default_lua = "none"))]
     pub fn write(&self, path: impl AsRef<Path>) -> std::io::Result<()> {
         std::fs::write(&path, self.get_bytes())?;
         #[cfg(unix)]
@@ -86,13 +63,6 @@ impl LuaCmd {
             program.file_name()?
         };
         match file_name.to_str()? {
-            #[cfg(any(
-                feature = "lua51",
-                feature = "lua52",
-                feature = "lua53",
-                feature = "lua54",
-                feature = "luajit",
-            ))]
             "lua" => Some(Self::default()),
             #[cfg(feature = "lua51")]
             "lua5.1" => Some(LuaCmd::Lua51),
@@ -122,6 +92,8 @@ impl LuaCmd {
             Lua54 => "lua5.4",
             #[cfg(feature = "luajit")]
             LuaJIT => "luajit",
+            #[allow(unreachable_patterns)]
+            _ => "lua",
         });
         s.push_str(EXE_SUFFIX);
         s

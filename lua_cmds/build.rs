@@ -13,18 +13,22 @@ fn main() -> std::io::Result<()> {
 
     let target_dir = out_dir.join("target");
 
+    let mut default_version = None;
+
     for version in [
-        #[cfg(feature = "lua51")]
-        "lua51",
-        #[cfg(feature = "lua52")]
-        "lua52",
-        #[cfg(feature = "lua53")]
-        "lua53",
         #[cfg(feature = "lua54")]
         "lua54",
+        #[cfg(feature = "lua53")]
+        "lua53",
+        #[cfg(feature = "lua52")]
+        "lua52",
+        #[cfg(feature = "lua51")]
+        "lua51",
         #[cfg(feature = "luajit")]
         "luajit",
     ] {
+        default_version = default_version.or(Some(version));
+
         let mut c = std::process::Command::new(&cargo_exe);
         c.arg("build");
         c.arg("--manifest-path").arg(lua_cmd_dir.join("Cargo.toml"));
@@ -52,5 +56,14 @@ fn main() -> std::io::Result<()> {
             out_dir.join(version),
         )?;
     }
+
+    println!(
+        r#"cargo::rustc-check-cfg=cfg(default_lua, values("none", "lua54", "lua53", "lua52", "lua51", "luajit"))"#
+    );
+    println!(
+        r#"cargo::rustc-cfg=default_lua="{}""#,
+        default_version.unwrap_or("none")
+    );
+
     Ok(())
 }
