@@ -42,6 +42,13 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_lua() -> Result<()> {
+    std::env::set_current_dir("..")?;
+    run_cmd(vec![], vec!["all".into()])?;
+    Ok(())
+}
+
 fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> Result<()> {
     let root_dir = std::env::current_dir()?;
     let config = config::Config::read(&root_dir)?;
