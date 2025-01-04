@@ -2,26 +2,11 @@ use std::{env, path::PathBuf, sync::Arc};
 
 const MIN_ZSTD_DICT_SAMPLES: usize = 7;
 
-const FORCE_USING_ZSTD_DICT: bool = true;
+const FORCE_USING_ZSTD_DICT: bool = !cfg!(debug_assertions);
 const MAX_ZSTD_DICT_SIZE: usize = 512 * 1024;
 const ZSTD_COMPRESSION_LEVEL: i32 = if cfg!(debug_assertions) { 3 } else { 22 };
 
 fn main() -> std::io::Result<()> {
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    let cargo_exe = env::var_os("CARGO").unwrap();
-    let build_profile = env::var("PROFILE").unwrap();
-    let target_triple = env::var("TARGET").unwrap();
-
-    let luacmd_dir = PathBuf::from("../luacmd");
-    assert!(luacmd_dir.exists());
-    println!("cargo::rerun-if-changed={}", luacmd_dir.display());
-    let bin_name = format!("luacmd{}", env::consts::EXE_SUFFIX);
-
-    let target_dir = out_dir.join("target");
-
-    let mut default_version = None;
-    let mut artifacts = Vec::new();
-
     let versions = [
         #[cfg(feature = "lua54")]
         "lua54",
@@ -34,9 +19,29 @@ fn main() -> std::io::Result<()> {
         #[cfg(feature = "luajit")]
         "luajit",
     ];
-    for version in versions {
-        default_version = default_version.or(Some(version));
+    println!(
+        r#"cargo::rustc-check-cfg=cfg(default_lua, values("none", "lua54", "lua53", "lua52", "lua51", "luajit"))"#
+    );
+    println!(
+        r#"cargo::rustc-cfg=default_lua="{}""#,
+        versions.first().unwrap_or(&"none")
+    );
 
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let cargo_exe = env::var_os("CARGO").unwrap();
+    let build_profile = env::var("PROFILE").unwrap();
+    let target_triple = env::var("TARGET").unwrap();
+
+    let luacmd_dir = PathBuf::from("../luacmd");
+    assert!(luacmd_dir.exists());
+    println!("cargo::rerun-if-changed={}", luacmd_dir.display());
+    let bin_name = format!("luacmd{}", env::consts::EXE_SUFFIX);
+
+    let target_dir = out_dir.join("target");
+
+    let mut artifacts = Vec::new();
+
+    for version in versions {
         let mut c = std::process::Command::new(&cargo_exe);
         c.arg("build");
         c.arg("--manifest-path").arg(luacmd_dir.join("Cargo.toml"));
@@ -64,14 +69,6 @@ fn main() -> std::io::Result<()> {
         let contents = std::fs::read(bin_path)?;
         artifacts.push((version, contents));
     }
-
-    println!(
-        r#"cargo::rustc-check-cfg=cfg(default_lua, values("none", "lua54", "lua53", "lua52", "lua51", "luajit"))"#
-    );
-    println!(
-        r#"cargo::rustc-cfg=default_lua="{}""#,
-        default_version.unwrap_or("none")
-    );
 
     println!(r#"cargo::rustc-check-cfg=cfg(zstd_dict)"#);
 
