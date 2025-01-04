@@ -1,7 +1,7 @@
 local package = {}
 do
     ---@type table<string, boolean>
-    local PUBLIC_MODULES
+    local PUBLIC_MODULES --[[@replace = bundler.PUBLIC_MODULES]]
 
     local function copy(dist, tbl)
         for k, v in pairs(tbl) do
