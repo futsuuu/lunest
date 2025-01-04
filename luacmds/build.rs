@@ -22,7 +22,7 @@ fn main() -> std::io::Result<()> {
     let mut default_version = None;
     let mut artifacts = Vec::new();
 
-    for version in [
+    let versions = [
         #[cfg(feature = "lua54")]
         "lua54",
         #[cfg(feature = "lua53")]
@@ -33,7 +33,8 @@ fn main() -> std::io::Result<()> {
         "lua51",
         #[cfg(feature = "luajit")]
         "luajit",
-    ] {
+    ];
+    for version in versions {
         default_version = default_version.or(Some(version));
 
         let mut c = std::process::Command::new(&cargo_exe);
