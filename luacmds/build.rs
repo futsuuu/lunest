@@ -54,6 +54,7 @@ fn main() -> std::io::Result<()> {
         c.arg("--target-dir").arg(&target_dir);
         c.args(["--color", "always"]);
 
+        eprintln!("building {version}...");
         assert!(c.status()?.success());
         let bin_path = target_dir
             .join(&target_triple)
@@ -71,11 +72,12 @@ fn main() -> std::io::Result<()> {
         default_version.unwrap_or("none")
     );
 
+    println!(r#"cargo::rustc-check-cfg=cfg(zstd_dict)"#);
+
     if artifacts.is_empty() {
         return Ok(());
     }
 
-    println!(r#"cargo::rustc-check-cfg=cfg(zstd_dict)"#);
     let dict = Arc::new(if MIN_ZSTD_DICT_SAMPLES <= artifacts.len() || FORCE_USING_ZSTD_DICT {
         println!("cargo::rustc-cfg=zstd_dict");
         let dict = zstd::dict::from_samples(

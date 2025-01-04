@@ -4,11 +4,13 @@ use std::{
     path::Path,
 };
 
+#[cfg(not(default_lua = "none"))]
 #[cfg(zstd_dict)]
 static ZSTD_DICT: std::sync::LazyLock<zstd::dict::DecoderDictionary<'static>> =
     std::sync::LazyLock::new(|| {
         zstd::dict::DecoderDictionary::copy(include_bytes!(concat!(env!("OUT_DIR"), "/zstd_dict")))
     });
+#[cfg(not(default_lua = "none"))]
 #[cfg(zstd_dict)]
 fn decompress(data: &[u8], capacity: usize) -> Vec<u8> {
     let dict = &*ZSTD_DICT;
@@ -17,6 +19,7 @@ fn decompress(data: &[u8], capacity: usize) -> Vec<u8> {
     std::io::copy(&mut decoder, &mut buf).unwrap();
     buf
 }
+#[cfg(not(default_lua = "none"))]
 #[cfg(not(zstd_dict))]
 fn decompress(data: &[u8], capacity: usize) -> Vec<u8> {
     let mut decoder = zstd::Decoder::new(data).unwrap();
@@ -92,6 +95,10 @@ impl LuaCmd {
         }
         Ok(())
     }
+    #[cfg(default_lua = "none")]
+    pub fn write(&self, _path: impl AsRef<Path>) -> std::io::Result<()> {
+        Err(std::io::Error::other("there are no embedded Lua commands"))
+    }
 
     pub fn from_program_name(program: impl AsRef<OsStr>) -> Option<Self> {
         let program = Path::new(program.as_ref());
@@ -101,6 +108,7 @@ impl LuaCmd {
             program.file_name()?
         };
         match file_name.to_str()? {
+            #[cfg(not(default_lua = "none"))]
             "lua" => Some(Self::default()),
             #[cfg(feature = "lua51")]
             "lua5.1" => Some(LuaCmd::Lua51),
@@ -130,8 +138,8 @@ impl LuaCmd {
             Lua54 => "lua5.4",
             #[cfg(feature = "luajit")]
             LuaJIT => "luajit",
-            #[allow(unreachable_patterns)]
-            _ => "lua",
+            #[cfg(default_lua = "none")]
+            None => "lua",
         });
         s.push_str(EXE_SUFFIX);
         s

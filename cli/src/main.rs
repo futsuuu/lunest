@@ -45,7 +45,10 @@ fn main() -> Result<()> {
 #[test]
 fn test_lua() -> Result<()> {
     std::env::set_current_dir("..")?;
+    #[cfg(feature = "luacmds-all")]
     run_cmd(vec![], vec!["all".into()])?;
+    #[cfg(not(feature = "luacmds-all"))]
+    run_cmd(vec![], vec![])?;
     Ok(())
 }
 
