@@ -79,7 +79,7 @@ fn main() -> std::io::Result<()> {
         return Ok(());
     }
 
-    let dict = Arc::new(if MIN_ZSTD_DICT_SAMPLES <= artifacts.len() || FORCE_USING_ZSTD_DICT {
+    let dict = if MIN_ZSTD_DICT_SAMPLES <= artifacts.len() || FORCE_USING_ZSTD_DICT {
         println!("cargo::rustc-cfg=zstd_dict");
         let dict = zstd::dict::from_samples(
             artifacts
@@ -98,10 +98,10 @@ fn main() -> std::io::Result<()> {
         ))
     } else {
         None
-    });
+    };
 
+    let dict = Arc::new(dict);
     let mut threads = Vec::new();
-
     for (version, contents) in artifacts {
         std::fs::write(
             out_dir.join(format!("{version}_size.rs")),

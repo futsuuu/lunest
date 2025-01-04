@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fs, path::Path};
+use std::{ffi::OsStr, path::Path};
 
 #[derive(Default)]
 pub struct Bundler {
@@ -89,7 +89,13 @@ impl Module {
                 }
                 .replace(['/', '\\'], ".")
             },
-            chunk: fs::read_to_string(path)?,
+            chunk: match std::fs::read_to_string(path) {
+                Err(e) => Err(std::io::Error::new(
+                    e.kind(),
+                    format!("failed to read `{}` to string: {e}", path.display()),
+                )),
+                ok => ok,
+            }?,
         })
     }
 
