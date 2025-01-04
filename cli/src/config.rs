@@ -191,12 +191,12 @@ impl Profile {
         let first = lua.first().context("command is empty")?;
         let mut cmd = match (
             which::which(first),
-            lua_cmds::LuaCmd::from_program_name(first),
+            luacmds::LuaCmd::from_program_name(first),
         ) {
             (Ok(p), _) => std::process::Command::new(p),
-            (Err(_), Some(lua_cmd)) => {
-                let p = temp_dir.join(lua_cmd.recommended_program_name());
-                lua_cmd.write(&p)?;
+            (Err(_), Some(c)) => {
+                let p = temp_dir.join(c.recommended_program_name());
+                c.write(&p)?;
                 std::process::Command::new(p)
             }
             _ => std::process::Command::new(first),

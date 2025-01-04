@@ -317,14 +317,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "lua_cmd"
+name = "luacmd"
 version = "0.0.0"
 dependencies = [
  "mlua",
 ]
 
 [[package]]
-name = "lua_cmds"
+name = "luacmds"
 version = "0.0.0"
 dependencies = [
  "zstd",
@@ -350,7 +350,7 @@ dependencies = [
  "crossterm",
  "globset",
  "indexmap",
- "lua_cmds",
+ "luacmds",
  "merge",
  "serde",
  "serde_json",

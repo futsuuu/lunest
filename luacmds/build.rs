@@ -12,10 +12,10 @@ fn main() -> std::io::Result<()> {
     let build_profile = env::var("PROFILE").unwrap();
     let target_triple = env::var("TARGET").unwrap();
 
-    let lua_cmd_dir = PathBuf::from("../lua_cmd");
-    assert!(lua_cmd_dir.exists());
-    println!("cargo::rerun-if-changed={}", lua_cmd_dir.display());
-    let bin_name = format!("lua_cmd{}", env::consts::EXE_SUFFIX);
+    let luacmd_dir = PathBuf::from("../luacmd");
+    assert!(luacmd_dir.exists());
+    println!("cargo::rerun-if-changed={}", luacmd_dir.display());
+    let bin_name = format!("luacmd{}", env::consts::EXE_SUFFIX);
 
     let target_dir = out_dir.join("target");
 
@@ -38,7 +38,7 @@ fn main() -> std::io::Result<()> {
 
         let mut c = std::process::Command::new(&cargo_exe);
         c.arg("build");
-        c.arg("--manifest-path").arg(lua_cmd_dir.join("Cargo.toml"));
+        c.arg("--manifest-path").arg(luacmd_dir.join("Cargo.toml"));
         c.args(["--features", version, "--no-default-features"]);
         c.args(["--target", target_triple.as_str()]);
         match build_profile.as_str() {

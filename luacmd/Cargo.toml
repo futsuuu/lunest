@@ -1,5 +1,5 @@
 [package]
-name = "lua_cmd"
+name = "luacmd"
 version.workspace = true
 edition.workspace = true
 
