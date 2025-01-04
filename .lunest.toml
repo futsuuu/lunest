@@ -1,9 +1,25 @@
 [group]
-all = ["default", "nvim"]
+all = ["lua51", "lua52", "lua53", "lua54", "luajit"]
 
 [profile.default]
-lua = ["lua"]
+lua = ["lua5.4"]
+include = ["module/**/*.lua"]
 init = "test_init.lua"
+
+[profile.lua51]
+lua = ["lua5.1"]
+
+[profile.lua52]
+lua = ["lua5.2"]
+
+[profile.lua53]
+lua = ["lua5.3"]
+
+[profile.lua54]
+lua = ["lua5.4"]
+
+[profile.luajit]
+lua = ["luajit"]
 
 [profile.nvim]
 lua = ["nvim", "-l"]

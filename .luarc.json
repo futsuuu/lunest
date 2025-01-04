@@ -4,8 +4,8 @@
     },
     "workspace": {
         "library": [
-            "./lua",
-            "./lib/json.lua"
+            "./module",
+            "./3rd/json.lua"
         ],
         "ignoreDir": [
             "test",
