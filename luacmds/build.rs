@@ -22,7 +22,7 @@ fn main() -> std::io::Result<()> {
     let mut default_version = None;
     let mut artifacts = Vec::new();
 
-    for version in [
+    let versions = [
         #[cfg(feature = "lua54")]
         "lua54",
         #[cfg(feature = "lua53")]
@@ -33,7 +33,8 @@ fn main() -> std::io::Result<()> {
         "lua51",
         #[cfg(feature = "luajit")]
         "luajit",
-    ] {
+    ];
+    for version in versions {
         default_version = default_version.or(Some(version));
 
         let mut c = std::process::Command::new(&cargo_exe);
@@ -78,7 +79,7 @@ fn main() -> std::io::Result<()> {
         return Ok(());
     }
 
-    let dict = Arc::new(if MIN_ZSTD_DICT_SAMPLES <= artifacts.len() || FORCE_USING_ZSTD_DICT {
+    let dict = if MIN_ZSTD_DICT_SAMPLES <= artifacts.len() || FORCE_USING_ZSTD_DICT {
         println!("cargo::rustc-cfg=zstd_dict");
         let dict = zstd::dict::from_samples(
             artifacts
@@ -97,10 +98,10 @@ fn main() -> std::io::Result<()> {
         ))
     } else {
         None
-    });
+    };
 
+    let dict = Arc::new(dict);
     let mut threads = Vec::new();
-
     for (version, contents) in artifacts {
         std::fs::write(
             out_dir.join(format!("{version}_size.rs")),

@@ -5,4 +5,3 @@ package.path = package.path
         "./module/?/init.lua",
         "./3rd/json.lua/?.lua",
     }, ";")
-

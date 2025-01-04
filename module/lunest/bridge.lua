@@ -4,15 +4,15 @@ local json = require("json")
 
 do
     ---@type string
-    local ROOT_DIR
+    local ROOT_DIR --[[@replace = lunest.ROOT_DIR]]
     ---@type { name: string, path: string }[]
-    local TARGET_FILES
+    local TARGET_FILES --[[@replace = lunest.TARGET_FILES]]
     ---@type string
-    local MSG_FILE
+    local MSG_FILE --[[@replace = lunest.MSG_FILE]]
     ---@type string?
-    local INIT_FILE
+    local INIT_FILE --[[@replace = lunest.INIT_FILE]]
     ---@type integer
-    local TERM_WIDTH
+    local TERM_WIDTH --[[@replace = lunest.TERM_WIDTH]]
 
     ---@return string
     function M.root_dir()

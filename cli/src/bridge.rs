@@ -61,35 +61,35 @@ impl Bridge {
         });
         let contents = contents
             .replace(
-                "local ROOT_DIR\n",
+                "--[[@replace = lunest.ROOT_DIR]]",
                 &format!(
-                    "local ROOT_DIR = \"{}\"\n",
+                    "= \"{}\"",
                     root_dir.display().to_string().replace('\\', r"\\")
                 ),
             )
             .replace(
-                "local TARGET_FILES\n",
-                &format!("local TARGET_FILES = {{ {files} }}\n"),
+                "--[[@replace = lunest.TARGET_FILES]]",
+                &format!("= {{ {files} }}"),
             )
             .replace(
-                "local MSG_FILE\n",
+                "--[[@replace = lunest.MSG_FILE]]",
                 &format!(
-                    "local MSG_FILE = \"{}\"\n",
+                    "= \"{}\"",
                     self.path.display().to_string().replace('\\', r"\\")
                 ),
             )
             .replace(
-                "local TERM_WIDTH\n",
+                "--[[@replace = lunest.TERM_WIDTH]]",
                 &format!(
-                    "local TERM_WIDTH = {}\n",
-                    crossterm::terminal::size().map_or(60, |size| size.0),
+                    "= {}",
+                    crossterm::terminal::size().map_or(60, |size| size.0)
                 ),
             );
         if let Some(path) = init_file {
             contents.replace(
-                "local INIT_FILE\n",
+                "--[[@replace = lunest.INIT_FILE]]",
                 &format!(
-                    "local INIT_FILE = \"{}\"\n",
+                    "= \"{}\"",
                     path.as_ref().display().to_string().replace('\\', r"\\"),
                 ),
             )
