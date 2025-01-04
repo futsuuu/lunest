@@ -52,9 +52,9 @@ impl Bundler {
 
     pub fn bundle(&self, default_module: Option<impl AsRef<str>>) -> String {
         let mut result = include_str!("./override.lua").replace(
-            "local PUBLIC_MODULES\n",
+            "--[[@replace = bundler.PUBLIC_MODULES]]",
             &format!(
-                "local PUBLIC_MODULES = {{ {} }}\n",
+                "= {{ {} }}",
                 self.publics
                     .iter()
                     .map(|m| format!("['{m}'] = true"))
