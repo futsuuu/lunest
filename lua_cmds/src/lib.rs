@@ -4,6 +4,44 @@ use std::{
     path::Path,
 };
 
+#[cfg(zstd_dict)]
+static ZSTD_DICT: std::sync::LazyLock<zstd::dict::DecoderDictionary<'static>> =
+    std::sync::LazyLock::new(|| {
+        zstd::dict::DecoderDictionary::copy(include_bytes!(concat!(env!("OUT_DIR"), "/zstd_dict")))
+    });
+#[cfg(zstd_dict)]
+fn decompress(data: &[u8], capacity: usize) -> Vec<u8> {
+    let dict = &*ZSTD_DICT;
+    let mut decoder = zstd::Decoder::with_prepared_dictionary(data, dict).unwrap();
+    let mut buf = Vec::with_capacity(capacity);
+    std::io::copy(&mut decoder, &mut buf).unwrap();
+    buf
+}
+#[cfg(not(zstd_dict))]
+fn decompress(data: &[u8], capacity: usize) -> Vec<u8> {
+    let mut decoder = zstd::Decoder::new(data).unwrap();
+    let mut buf = Vec::with_capacity(capacity);
+    std::io::copy(&mut decoder, &mut buf).unwrap();
+    buf
+}
+
+macro_rules! lazy_decompress {
+    ($name:ident, $version:literal) => {
+        #[cfg(feature = $version)]
+        static $name: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(|| {
+            decompress(
+                include_bytes!(concat!(env!("OUT_DIR"), "/", $version, ".zst")),
+                include!(concat!(env!("OUT_DIR"), "/", $version, "_size.rs")),
+            )
+        });
+    };
+}
+lazy_decompress!(LUA54, "lua54");
+lazy_decompress!(LUA53, "lua53");
+lazy_decompress!(LUA52, "lua52");
+lazy_decompress!(LUA51, "lua51");
+lazy_decompress!(LUAJIT, "luajit");
+
 #[derive(Debug, Default, Clone, Copy)]
 pub enum LuaCmd {
     #[cfg(feature = "lua51")]
@@ -31,16 +69,16 @@ impl LuaCmd {
     pub fn get_bytes(&self) -> &'static [u8] {
         use LuaCmd::*;
         match self {
-            #[cfg(feature = "lua51")]
-            Lua51 => include_bytes!(concat!(env!("OUT_DIR"), "/lua51")),
-            #[cfg(feature = "lua52")]
-            Lua52 => include_bytes!(concat!(env!("OUT_DIR"), "/lua52")),
-            #[cfg(feature = "lua53")]
-            Lua53 => include_bytes!(concat!(env!("OUT_DIR"), "/lua53")),
             #[cfg(feature = "lua54")]
-            Lua54 => include_bytes!(concat!(env!("OUT_DIR"), "/lua54")),
+            Lua54 => LUA54.as_slice(),
+            #[cfg(feature = "lua53")]
+            Lua53 => LUA53.as_slice(),
+            #[cfg(feature = "lua52")]
+            Lua52 => LUA52.as_slice(),
+            #[cfg(feature = "lua51")]
+            Lua51 => LUA51.as_slice(),
             #[cfg(feature = "luajit")]
-            LuaJIT => include_bytes!(concat!(env!("OUT_DIR"), "/luajit")),
+            LuaJIT => LUAJIT.as_slice(),
         }
     }
 

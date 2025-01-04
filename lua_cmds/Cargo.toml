@@ -10,3 +10,9 @@ lua52 = []
 lua53 = []
 lua54 = []
 luajit = []
+
+[dependencies]
+zstd = { workspace = true }
+
+[build-dependencies]
+zstd = { workspace = true, features = ["zdict_builder"] }
