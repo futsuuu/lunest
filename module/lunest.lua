@@ -37,6 +37,7 @@ end
 local function main()
     package.loaded.lunest = M
 
+    bridge.read_input()
     local init_file = bridge.get_init_file()
     if init_file then
         dofile(init_file)

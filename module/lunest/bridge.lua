@@ -2,41 +2,29 @@ local M = {}
 
 local json = require("json")
 
-do
-    ---@type string
-    local ROOT_DIR --[[@replace = lunest.ROOT_DIR]]
-    ---@type { name: string, path: string }[]
-    local TARGET_FILES --[[@replace = lunest.TARGET_FILES]]
-    ---@type string
-    local MSG_FILE --[[@replace = lunest.MSG_FILE]]
-    ---@type string?
-    local INIT_FILE --[[@replace = lunest.INIT_FILE]]
-    ---@type integer
-    local TERM_WIDTH --[[@replace = lunest.TERM_WIDTH]]
+local File = require("lunest.File")
 
-    ---@return string
-    function M.root_dir()
-        return ROOT_DIR
-    end
-    ---@return { name: string, path: string }[]
-    function M.get_target_files()
-        return TARGET_FILES
-    end
-    ---@return string
-    function M.get_msg_file_path()
-        return MSG_FILE
-    end
-    ---@return string?
-    function M.get_init_file()
-        return INIT_FILE
-    end
-    ---@return integer
-    function M.get_term_width()
-        return TERM_WIDTH
-    end
+---@return lunest.File
+local function open_input_file()
+    return File.open(assert(os.getenv("LUNEST_IN")), "r")
 end
 
----@class lunest.bridge.Message
+---@return lunest.File
+local function open_output_file()
+    return File.open(assert(os.getenv("LUNEST_OUT")), "a")
+end
+
+---@alias lunest.bridge.Input
+---| lunest.bridge.Initialize
+
+---@class lunest.bridge.Initialize
+---@field type "Initialize"
+---@field init_file string?
+---@field root_dir string
+---@field target_files { name: string, path: string }[]
+---@field term_width integer
+
+---@class lunest.bridge.Output
 ---@field TestStarted? lunest.bridge.TestStarted
 ---@field TestFinished? lunest.bridge.TestFinished
 
@@ -55,21 +43,64 @@ end
 ---@class lunest.bridge.TestErrorInfo
 ---@field Diff? { left: string, right: string }
 
----@type file*
-local msg_file
+---@type lunest.File
+local input_file
+---@type lunest.File
+local output_file
 
----@param message lunest.bridge.Message
-local function write_msg(message)
-    if not msg_file then
-        msg_file = assert(io.open(M.get_msg_file_path(), "a"))
+local input_reader = coroutine.create(function()
+    if not input_file then
+        input_file = open_input_file()
     end
-    assert(msg_file:write(json.encode(message) .. "\n"))
-    msg_file:flush()
+    local buf = ""
+    while not input_file:is_closed() do
+        local line = input_file:readln()
+        if line then
+            if line:sub(#line) == "\n" then
+                coroutine.yield(buf .. line)
+                buf = ""
+            else
+                buf = buf .. line
+            end
+        end
+    end
+end)
+
+---@type lunest.bridge.Initialize
+local initialize
+
+function M.read_input()
+    local _, line = assert(coroutine.resume(input_reader))
+    local input = json.decode(line)
+    if input.type == "Initialize" then
+        initialize = input
+    end
+end
+
+function M.get_term_width()
+    return initialize.term_width
+end
+function M.root_dir()
+    return initialize.root_dir
+end
+function M.get_init_file()
+    return initialize.init_file
+end
+function M.get_target_files()
+    return initialize.target_files
+end
+
+---@param req lunest.bridge.Output
+local function write_output(req)
+    if not output_file then
+        output_file = open_output_file()
+    end
+    output_file:writeln(json.encode(req))
 end
 
 ---@param title string[]
 function M.start_test(title)
-    write_msg({
+    write_output({
         TestStarted = { title = title },
     })
 end
@@ -77,7 +108,7 @@ end
 ---@param title string[]
 ---@param err lunest.bridge.TestError?
 function M.finish_test(title, err)
-    write_msg({
+    write_output({
         TestFinished = {
             title = title,
             error = err,
@@ -86,8 +117,11 @@ function M.finish_test(title, err)
 end
 
 function M.finish()
-    if msg_file then
-        assert(msg_file:close())
+    if input_file then
+        input_file:close()
+    end
+    if output_file then
+        output_file:close()
     end
 end
 
