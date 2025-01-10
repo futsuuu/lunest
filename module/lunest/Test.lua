@@ -8,7 +8,7 @@ local M = {}
 local Group = require("lunest.Group")
 local inspect = require("lunest.inspect")
 
----@type lunest.Test
+---@type lunest.Test?
 local current = nil
 
 ---@return lunest.Test?
@@ -137,7 +137,10 @@ function M:wrap(func)
     local title = self:get_title()
     return function()
         self.cx:process():notify_test_started(title)
+        assert(not current)
+        current = self
         local success, err = xpcall(test_runner(func), handle_error)
+        current = nil
         if success then
             err = nil
         end
