@@ -12,7 +12,8 @@ local File = require("lunest.File")
 
 ---@param input lunest.File
 ---@param output lunest.File
-function M.from_io(input, output)
+---@return self
+function M.new(input, output)
     return setmetatable({
         input = input,
         output = output,
@@ -22,8 +23,11 @@ function M.from_io(input, output)
     }, M)
 end
 
-function M.open()
-    return M.from_io(File.open(assert(os.getenv("LUNEST_IN")), "r"), File.open(assert(os.getenv("LUNEST_OUT")), "a"))
+---@param input string
+---@param output string
+---@return self
+function M.open(input, output)
+    return M.new(File.open(input, "r"), File.open(output, "a"))
 end
 
 function M:close()
@@ -82,8 +86,7 @@ end
 --- enum
 ---@class lunest.Input
 ---@field Initialize? lunest.Input.Initialize
-
---- struct
+--- enum content
 ---@class lunest.Input.Initialize
 ---@field init_file string?
 ---@field root_dir string
@@ -94,12 +97,10 @@ end
 ---@class lunest.Output
 ---@field TestStarted? lunest.Output.TestStarted
 ---@field TestFinished? lunest.Output.TestFinished
-
---- struct
+--- enum content
 ---@class lunest.Output.TestStarted
 ---@field title string[]
-
---- struct
+--- enum content
 ---@class lunest.Output.TestFinished
 ---@field title string[]
 ---@field error lunest.TestError?

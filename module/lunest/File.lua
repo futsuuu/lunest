@@ -8,7 +8,9 @@ M.__index = M
 ---@param mode openmode?
 ---@return self
 function M.open(filename, mode)
-    return setmetatable({ assert(io.open(filename, mode)) }, M)
+    return setmetatable({
+        [1] = assert(io.open(filename, mode)),
+    }, M)
 end
 
 function M:close()
@@ -39,20 +41,23 @@ function M:size()
     return n
 end
 
----@return string?
-function M:readln()
-    if _G["jit"] or _VERSION ~= "Lua 5.1" then
+if _G["jit"] or _VERSION ~= "Lua 5.1" then
+    function M:readln()
         return self[1]:read("*L")
     end
-    local line = self[1]:read("*l")
-    if not line then
-        return
+else
+    ---@return string?
+    function M:readln()
+        local line = self[1]:read("*l")
+        if not line then
+            return
+        end
+        self[1]:seek("cur", -1)
+        if self[1]:read(1) == "\n" then
+            line = line .. "\n"
+        end
+        return line
     end
-    self[1]:seek("cur", -1)
-    if self[1]:read(1) == "\n" then
-        line = line .. "\n"
-    end
-    return line
 end
 
 return M
