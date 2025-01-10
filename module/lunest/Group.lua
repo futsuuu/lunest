@@ -1,4 +1,5 @@
 ---@class lunest.Group
+---@field cx lunest.Context
 ---@field name string
 ---@field source string
 ---@field parent lunest.Group?
@@ -16,11 +17,13 @@ end
 ---@private
 M.__index = M
 
+---@param cx lunest.Context
 ---@param name string
 ---@param source string
 ---@return self
-function M.new(name, source)
+function M.new(cx, name, source)
     local self = setmetatable({}, M)
+    self.cx = cx
     self.name = name
     self.source = source
     self.parent = current

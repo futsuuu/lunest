@@ -92,7 +92,6 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
 }
 
 #[derive(Serialize)]
-#[serde(tag = "type")]
 pub enum Input {
     Initialize {
         init_file: Option<std::path::PathBuf>,
