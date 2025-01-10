@@ -2,8 +2,6 @@ local M = {}
 
 local test = require("lunest.wrapper")
 
-local bridge = require("lunest.bridge")
-
 ---@generic F: function
 ---@param func F
 ---@return F
@@ -86,8 +84,11 @@ test.test("name", function()
     assert(name("/share/lua/foo/init.lua", r, t) == "foo.init")
 end)
 
-function M.name(file)
-    return name(file, bridge.root_dir(), package.path)
+---@param root_dir string
+---@param file string
+---@return string?
+function M.name(root_dir, file)
+    return name(file, root_dir, package.path)
 end
 
 return M

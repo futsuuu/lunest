@@ -53,6 +53,11 @@ impl Config {
         }
         profile.merge(Profile::default());
 
+        anyhow::ensure!(
+            !profile.lua.as_ref().unwrap().is_empty(),
+            "lua command is empty"
+        );
+
         Ok((name, profile))
     }
 
@@ -186,12 +191,12 @@ impl Default for Profile {
 }
 
 impl Profile {
-    pub fn lua_command(&self, temp_dir: &Path) -> Result<std::process::Command> {
+    pub fn lua_command(&self, temp_dir: &Path) -> std::io::Result<std::process::Command> {
         let lua = self.lua.as_ref().unwrap();
-        let first = lua.first().context("command is empty")?;
+        let program = lua.first().unwrap(); // already validated in [`Config::profile`]
         let mut cmd = match (
-            which::which(first),
-            luacmds::LuaCmd::from_program_name(first),
+            which::which(program),
+            luacmds::LuaCmd::from_program_name(program),
         ) {
             (Ok(p), _) => std::process::Command::new(p),
             (Err(_), Some(c)) => {
@@ -199,7 +204,7 @@ impl Profile {
                 c.write(&p)?;
                 std::process::Command::new(p)
             }
-            _ => std::process::Command::new(first),
+            _ => std::process::Command::new(program),
         };
         cmd.args(lua.get(1..).unwrap_or_default());
         Ok(cmd)
