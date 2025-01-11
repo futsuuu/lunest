@@ -7,66 +7,38 @@ const MAX_ZSTD_DICT_SIZE: usize = 512 * 1024;
 const ZSTD_COMPRESSION_LEVEL: i32 = if cfg!(debug_assertions) { 3 } else { 22 };
 
 fn main() -> std::io::Result<()> {
-    let versions = [
-        #[cfg(feature = "lua54")]
-        "lua54",
-        #[cfg(feature = "lua53")]
-        "lua53",
-        #[cfg(feature = "lua52")]
-        "lua52",
-        #[cfg(feature = "lua51")]
-        "lua51",
-        #[cfg(feature = "luajit")]
-        "luajit",
-    ];
-    println!(
-        r#"cargo::rustc-check-cfg=cfg(default_lua, values("none", "lua54", "lua53", "lua52", "lua51", "luajit"))"#
-    );
-    println!(
-        r#"cargo::rustc-cfg=default_lua="{}""#,
-        versions.first().unwrap_or(&"none")
-    );
+    let versions = ["lua54", "lua53", "lua52", "lua51", "luajit"];
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    let cargo_exe = env::var_os("CARGO").unwrap();
-    let build_profile = env::var("PROFILE").unwrap();
-    let target_triple = env::var("TARGET").unwrap();
+    let opt_level = env::var("OPT_LEVEL").unwrap();
 
-    let luacmd_dir = PathBuf::from("../luacmd");
-    assert!(luacmd_dir.exists());
-    println!("cargo::rerun-if-changed={}", luacmd_dir.display());
-    let bin_name = format!("luacmd{}", env::consts::EXE_SUFFIX);
+    println!("cargo::rerun-if-changed=../build.zig");
+    println!("cargo::rerun-if-changed=../build.zig.zon");
+    println!("cargo::rerun-if-changed=../lua-rt");
 
-    let target_dir = out_dir.join("target");
+    {
+        let mut c = std::process::Command::new("zig");
+        c.args(["build", "-j1"]);
+        match opt_level.as_str() {
+            "s" | "z" => {
+                c.arg("--release=small");
+            }
+            "1" => {
+                c.arg("--release=safe");
+            }
+            "2" | "3" => {
+                c.arg("--release=fast");
+            }
+            _ => (),
+        }
+        assert!(c.status()?.success());
+    }
 
     let mut artifacts = Vec::new();
-
+    let bin_dir = PathBuf::from("../zig-out/bin");
     for version in versions {
-        let mut c = std::process::Command::new(&cargo_exe);
-        c.arg("build");
-        c.arg("--manifest-path").arg(luacmd_dir.join("Cargo.toml"));
-        c.args(["--features", version, "--no-default-features"]);
-        c.args(["--target", target_triple.as_str()]);
-        match build_profile.as_str() {
-            "debug" => (),
-            "release" => {
-                c.arg("--release");
-            }
-            profile => {
-                c.args(["--profile", profile]);
-            }
-        }
-
-        c.arg("--target-dir").arg(&target_dir);
-        c.args(["--color", "always"]);
-
-        eprintln!("building {version}...");
-        assert!(c.status()?.success());
-        let bin_path = target_dir
-            .join(&target_triple)
-            .join(&build_profile)
-            .join(&bin_name);
-        let contents = std::fs::read(bin_path)?;
+        let bin_name = format!("{version}{}", env::consts::EXE_SUFFIX);
+        let contents = std::fs::read(bin_dir.join(bin_name))?;
         artifacts.push((version, contents));
     }
 

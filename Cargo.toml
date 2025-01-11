@@ -2,7 +2,6 @@
 members = [
     "bundler",
     "cli",
-    "luacmd",
     "luacmds",
 ]
 default-members = ["cli"]
