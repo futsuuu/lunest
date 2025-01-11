@@ -15,7 +15,7 @@ local F = Fmt.new
 ---@class lunest.inspect.Value.Base
 local Base = {}
 ---@class lunest.inspect.Value.Single: lunest.inspect.Value.Base
----@field package inner number | boolean | string | function | thread | userdata
+---@field package inner nil | number | boolean | string | function | thread | userdata
 local Single = setmetatable({}, Base)
 ---@class lunest.inspect.Value.Table: lunest.inspect.Value.Base
 ---@field package pairs { key: lunest.inspect.Value, value: lunest.inspect.Value }[]
@@ -152,7 +152,7 @@ do
     ---@private
     Single.__index = Single
 
-    ---@param inner number | boolean | string | function | thread | userdata
+    ---@param inner nil | number | boolean | string | function | thread | userdata
     ---@return self
     function Single.new(inner)
         local self = setmetatable({}, Single)
@@ -164,7 +164,7 @@ do
     function Single:fmt()
         local a = self.inner
         local ty = type(a)
-        if ty == "boolean" or ty == "number" then
+        if ty == "nil" or ty == "boolean" or ty == "number" then
             return tostring(a)
         elseif ty == "string" then
             return (("%q"):format(a):gsub("\\\n", "\\n"))
@@ -234,10 +234,19 @@ do
         end
     end
 
-    test.test("Single:fmt_accessor", function()
-        assertion.eq(F("[", "1", "]"), Single.new(1):fmt_accessor())
-        assertion.eq(".hello", Single.new("hello"):fmt_accessor())
-        assertion.eq(F("[", '"end"', "]"), Single.new("end"):fmt_accessor())
+    test.group("single", function()
+        test.test("primitive", function()
+            assertion.eq("nil", Single.new(nil):fmt())
+            assertion.eq("1", Single.new(1):fmt())
+            assertion.eq("false", Single.new(false):fmt())
+            assertion.eq([["abc\"de\nfg"]], Single.new('abc"de\nfg'):fmt())
+        end)
+
+        test.test("fmt_accessor", function()
+            assertion.eq(F("[", "1", "]"), Single.new(1):fmt_accessor())
+            assertion.eq(".hello", Single.new("hello"):fmt_accessor())
+            assertion.eq(F("[", '"end"', "]"), Single.new("end"):fmt_accessor())
+        end)
     end)
 end
 
