@@ -4,29 +4,31 @@ fn main() -> std::io::Result<()> {
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let versions = ["lua54", "lua53", "lua52", "lua51"];
 
-    let opt_level = std::env::var("OPT_LEVEL").unwrap();
-
     println!("cargo::rerun-if-changed=../build.zig");
     println!("cargo::rerun-if-changed=../build.zig.zon");
-    println!("cargo::rerun-if-changed=../lua-rt");
+    println!("cargo::rerun-if-changed=./main.zig");
 
-    {
-        let mut c = std::process::Command::new("zig");
-        c.arg("build");
-        match opt_level.as_str() {
-            "s" | "z" => {
-                c.arg("--release=small");
-            }
-            "1" => {
-                c.arg("--release=safe");
-            }
-            "2" | "3" => {
-                c.arg("--release=fast");
-            }
-            _ => (),
-        }
-        assert!(c.status()?.success());
-    }
+    let mut c = std::process::Command::new("zig");
+    c.arg("build");
+    let target = format!(
+        "-Dtarget={}-{}-{}{}",
+        std::env::var("CARGO_CFG_TARGET_ARCH").unwrap(),
+        std::env::var("CARGO_CFG_TARGET_OS").unwrap(),
+        std::env::var("CARGO_CFG_TARGET_ENV").unwrap(),
+        std::env::var("CARGO_CFG_TARGET_ABI").unwrap(),
+    );
+    c.arg(target);
+    eprintln!("zig target: {target}");
+    let optimize = match std::env::var("OPT_LEVEL").unwrap().as_str() {
+        "s" | "z" => "-Doptimize=ReleaseSmall",
+        "2" | "3" => "-Doptimize=ReleaseFast",
+        "1" => "-Doptimize=ReleaseSafe",
+        "0" => "-Doptimize=Debug",
+        _ => unreachable!(),
+    };
+    c.arg(optimize);
+    eprintln!("zig optimize mode: {optimize}");
+    assert!(c.status()?.success());
 
     let mut artifacts = Vec::new();
     let bin_dir = std::path::PathBuf::from("../zig-out/bin");
