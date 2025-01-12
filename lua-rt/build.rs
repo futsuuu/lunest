@@ -2,7 +2,14 @@ const ZSTD_COMPRESSION_LEVEL: i32 = if cfg!(debug_assertions) { 3 } else { 22 };
 
 fn main() -> std::io::Result<()> {
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    let versions = ["lua54", "lua53", "lua52", "lua51", "luajit"];
+    let versions = [
+        "lua54",
+        "lua53",
+        "lua52",
+        "lua51",
+        #[cfg(not(target_os = "macos"))]
+        "luajit",
+    ];
 
     let opt_level = std::env::var("OPT_LEVEL").unwrap();
 
