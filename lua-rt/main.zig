@@ -12,6 +12,22 @@ pub fn main() !void {
     defer lua.deinit();
     lua.openLibs();
 
+    {
+        lua.createTable(2, 0);
+        var i: switch (ziglua.lang) {
+            .lua51, .lua52, .luajit => i32,
+            else => ziglua.Integer,
+        } = -1;
+        var args = std.process.args();
+        defer args.deinit();
+        while (args.next()) |arg| {
+            _ = lua.pushString(arg);
+            lua.rawSetIndex(-2, i);
+            i += 1;
+        }
+        lua.setGlobal("arg");
+    }
+
     lua.pushFunction(ziglua.wrap(traceback));
     {
         var args = std.process.args();
