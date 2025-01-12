@@ -1,7 +1,10 @@
 [package]
-name = "luacmds"
+name = "lua-rt"
 version.workspace = true
 edition.workspace = true
+
+[lib]
+path = "lib.rs"
 
 [dependencies]
 zstd.workspace = true

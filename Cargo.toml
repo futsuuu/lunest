@@ -2,7 +2,7 @@
 members = [
     "bundler",
     "cli",
-    "luacmds",
+    "lua-rt",
 ]
 default-members = ["cli"]
 resolver = "2"

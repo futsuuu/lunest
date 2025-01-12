@@ -27,7 +27,7 @@ lazy_decompress!(LUA51, "lua51");
 lazy_decompress!(LUAJIT, "luajit");
 
 #[derive(Debug, Default, Clone, Copy)]
-pub enum LuaCmd {
+pub enum Lua {
     Lua51,
     Lua52,
     Lua53,
@@ -36,15 +36,14 @@ pub enum LuaCmd {
     LuaJIT,
 }
 
-impl LuaCmd {
+impl Lua {
     pub fn get_bytes(&self) -> &'static [u8] {
-        use LuaCmd::*;
         match self {
-            Lua54 => LUA54.as_slice(),
-            Lua53 => LUA53.as_slice(),
-            Lua52 => LUA52.as_slice(),
-            Lua51 => LUA51.as_slice(),
-            LuaJIT => LUAJIT.as_slice(),
+            Lua::Lua54 => LUA54.as_slice(),
+            Lua::Lua53 => LUA53.as_slice(),
+            Lua::Lua52 => LUA52.as_slice(),
+            Lua::Lua51 => LUA51.as_slice(),
+            Lua::LuaJIT => LUAJIT.as_slice(),
         }
     }
 
@@ -66,25 +65,24 @@ impl LuaCmd {
             program.file_name()?
         };
         match file_name.to_str()? {
-            "lua" => Some(Self::default()),
-            "lua5.1" => Some(LuaCmd::Lua51),
-            "lua5.2" => Some(LuaCmd::Lua52),
-            "lua5.3" => Some(LuaCmd::Lua53),
-            "lua5.4" => Some(LuaCmd::Lua54),
-            "luajit" => Some(LuaCmd::LuaJIT),
+            "lua" => Some(Lua::default()),
+            "lua5.1" => Some(Lua::Lua51),
+            "lua5.2" => Some(Lua::Lua52),
+            "lua5.3" => Some(Lua::Lua53),
+            "lua5.4" => Some(Lua::Lua54),
+            "luajit" => Some(Lua::LuaJIT),
             _ => None,
         }
     }
 
     pub fn recommended_program_name(&self) -> String {
         let mut s = String::with_capacity(10);
-        use LuaCmd::*;
         s.push_str(match self {
-            Lua51 => "lua5.1",
-            Lua52 => "lua5.2",
-            Lua53 => "lua5.3",
-            Lua54 => "lua5.4",
-            LuaJIT => "luajit",
+            Lua::Lua51 => "lua5.1",
+            Lua::Lua52 => "lua5.2",
+            Lua::Lua53 => "lua5.3",
+            Lua::Lua54 => "lua5.4",
+            Lua::LuaJIT => "luajit",
         });
         s.push_str(EXE_SUFFIX);
         s

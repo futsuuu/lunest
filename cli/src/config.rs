@@ -196,7 +196,7 @@ impl Profile {
         let program = lua.first().unwrap(); // already validated in [`Config::profile`]
         let mut cmd = match (
             which::which(program),
-            luacmds::LuaCmd::from_program_name(program),
+            lua_rt::Lua::from_program_name(program),
         ) {
             (Ok(p), _) => std::process::Command::new(p),
             (Err(_), Some(c)) => {
