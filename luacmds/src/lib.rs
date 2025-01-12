@@ -4,27 +4,12 @@ use std::{
     path::Path,
 };
 
-#[cfg(zstd_dict)]
-static ZSTD_DICT: std::sync::LazyLock<zstd::dict::DecoderDictionary<'static>> =
-    std::sync::LazyLock::new(|| {
-        zstd::dict::DecoderDictionary::copy(include_bytes!(concat!(env!("OUT_DIR"), "/zstd_dict")))
-    });
-#[cfg(zstd_dict)]
-fn decompress(data: &[u8], capacity: usize) -> Vec<u8> {
-    let dict = &*ZSTD_DICT;
-    let mut decoder = zstd::Decoder::with_prepared_dictionary(data, dict).unwrap();
-    let mut buf = Vec::with_capacity(capacity);
-    std::io::copy(&mut decoder, &mut buf).unwrap();
-    buf
-}
-#[cfg(not(zstd_dict))]
 fn decompress(data: &[u8], capacity: usize) -> Vec<u8> {
     let mut decoder = zstd::Decoder::new(data).unwrap();
     let mut buf = Vec::with_capacity(capacity);
     std::io::copy(&mut decoder, &mut buf).unwrap();
     buf
 }
-
 macro_rules! lazy_decompress {
     ($name:ident, $version:literal) => {
         static $name: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(|| {
