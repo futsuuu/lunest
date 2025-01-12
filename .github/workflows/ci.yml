@@ -32,10 +32,6 @@ jobs:
 
       - uses: mlugg/setup-zig@v1
 
-      - uses: Hanaasagi/zig-action-cache@v1.1.5
-        with:
-          cache-on-failure: true
-
       - name: cargo test
         run: cargo test --workspace --all-targets
 
@@ -54,10 +50,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - uses: mlugg/setup-zig@v1
-
-      - uses: Hanaasagi/zig-action-cache@v1.1.5
-        with:
-          cache-on-failure: true
 
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets
