@@ -24,8 +24,6 @@ lazy_decompress!(LUA54, "lua54");
 lazy_decompress!(LUA53, "lua53");
 lazy_decompress!(LUA52, "lua52");
 lazy_decompress!(LUA51, "lua51");
-#[cfg(not(target_os = "macos"))]
-lazy_decompress!(LUAJIT, "luajit");
 
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Lua {
@@ -34,8 +32,6 @@ pub enum Lua {
     Lua53,
     #[default]
     Lua54,
-    #[cfg(not(target_os = "macos"))]
-    LuaJIT,
 }
 
 impl Lua {
@@ -45,8 +41,6 @@ impl Lua {
             Lua::Lua53 => LUA53.as_slice(),
             Lua::Lua52 => LUA52.as_slice(),
             Lua::Lua51 => LUA51.as_slice(),
-            #[cfg(not(target_os = "macos"))]
-            Lua::LuaJIT => LUAJIT.as_slice(),
         }
     }
 
@@ -73,8 +67,6 @@ impl Lua {
             "lua5.2" => Some(Lua::Lua52),
             "lua5.3" => Some(Lua::Lua53),
             "lua5.4" => Some(Lua::Lua54),
-            #[cfg(not(target_os = "macos"))]
-            "luajit" => Some(Lua::LuaJIT),
             _ => None,
         }
     }
@@ -86,8 +78,6 @@ impl Lua {
             Lua::Lua52 => "lua5.2",
             Lua::Lua53 => "lua5.3",
             Lua::Lua54 => "lua5.4",
-            #[cfg(not(target_os = "macos"))]
-            Lua::LuaJIT => "luajit",
         });
         s.push_str(EXE_SUFFIX);
         s

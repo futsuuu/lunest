@@ -18,8 +18,5 @@ lua = ["lua5.3"]
 [profile.lua54]
 lua = ["lua5.4"]
 
-[profile.luajit]
-lua = ["luajit"]
-
 [profile.nvim]
 lua = ["nvim", "-l"]

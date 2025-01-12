@@ -7,8 +7,6 @@ fn main() -> std::io::Result<()> {
         "lua53",
         "lua52",
         "lua51",
-        #[cfg(not(target_os = "macos"))]
-        "luajit",
     ];
 
     let opt_level = std::env::var("OPT_LEVEL").unwrap();
