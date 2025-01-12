@@ -1,16 +1,13 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Lang = enum { lua51, lua52, lua53, lua54, luajit };
+const Lang = enum { lua51, lua52, lua53, lua54 };
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    for ([_]Lang{ .lua51, .lua52, .lua53, .lua54, .luajit }) |lang| {
-        if (builtin.os.tag == .macos and lang == .luajit) {
-            continue;
-        }
+    for ([_]Lang{ .lua51, .lua52, .lua53, .lua54 }) |lang| {
         const ziglua = b.lazyDependency("ziglua", .{
             .target = target,
             .optimize = optimize,

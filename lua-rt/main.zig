@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 
 const ziglua = @import("ziglua");
@@ -12,15 +13,20 @@ pub fn main() !void {
     defer lua.deinit();
     lua.openLibs();
 
+    var file_name: ?[:0]const u8 = null;
     {
         lua.createTable(2, 0);
         var i: switch (ziglua.lang) {
             .lua51, .lua52, .luajit => i32,
             else => ziglua.Integer,
         } = -1;
-        var args = std.process.args();
+        var args = if (builtin.os.tag == .windows)
+            try std.process.argsWithAllocator(a)
+        else
+            std.process.args();
         defer args.deinit();
         while (args.next()) |arg| {
+            if (i == 0) file_name = arg;
             _ = lua.pushString(arg);
             lua.rawSetIndex(-2, i);
             i += 1;
@@ -29,15 +35,9 @@ pub fn main() !void {
     }
 
     lua.pushFunction(ziglua.wrap(traceback));
-    {
-        var args = std.process.args();
-        defer args.deinit();
-        _ = args.skip();
-        const file_name = args.next().?;
-        switch (ziglua.lang) {
-            .luajit, .lua51 => try lua.loadFile(file_name),
-            else => try lua.loadFile(file_name, .binary_text),
-        }
+    switch (ziglua.lang) {
+        .luajit, .lua51 => try lua.loadFile(file_name.?),
+        else => try lua.loadFile(file_name.?, .binary_text),
     }
     lua.protectedCall(.{
         .results = ziglua.mult_return,
@@ -49,7 +49,10 @@ pub fn main() !void {
 }
 
 fn traceback(lua: *Lua) !i32 {
-    var args = std.process.args();
+    var args = if (builtin.os.tag == .windows)
+        try std.process.argsWithAllocator(lua.allocator())
+    else
+        std.process.args();
     defer args.deinit();
     const exe = args.next().?;
     const errmsg = try lua.toString(-1);
