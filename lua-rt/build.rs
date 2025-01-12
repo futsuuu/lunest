@@ -17,8 +17,8 @@ fn main() -> std::io::Result<()> {
         std::env::var("CARGO_CFG_TARGET_ENV").unwrap(),
         std::env::var("CARGO_CFG_TARGET_ABI").unwrap(),
     );
-    c.arg(target);
     eprintln!("zig target: {target}");
+    c.arg(target);
     let optimize = match std::env::var("OPT_LEVEL").unwrap().as_str() {
         "s" | "z" => "-Doptimize=ReleaseSmall",
         "2" | "3" => "-Doptimize=ReleaseFast",
@@ -26,8 +26,8 @@ fn main() -> std::io::Result<()> {
         "0" => "-Doptimize=Debug",
         _ => unreachable!(),
     };
-    c.arg(optimize);
     eprintln!("zig optimize mode: {optimize}");
+    c.arg(optimize);
     assert!(c.status()?.success());
 
     let mut artifacts = Vec::new();
