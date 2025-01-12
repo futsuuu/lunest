@@ -10,13 +10,16 @@ fn main() -> std::io::Result<()> {
 
     let mut c = std::process::Command::new("zig");
     c.arg("build");
-    let target = format!(
-        "-Dtarget={}-{}-{}{}",
-        std::env::var("CARGO_CFG_TARGET_ARCH").unwrap(),
-        std::env::var("CARGO_CFG_TARGET_OS").unwrap(),
-        std::env::var("CARGO_CFG_TARGET_ENV").unwrap(),
-        std::env::var("CARGO_CFG_TARGET_ABI").unwrap(),
-    );
+    let target = {
+        let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+        let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
+        let mut abi = std::env::var("CARGO_CFG_TARGET_ENV").unwrap();
+        abi.push_str(&std::env::var("CARGO_CFG_TARGET_ABI").unwrap());
+        if abi.is_empty() {
+            abi = "none".into();
+        }
+        format!("-Dtarget={arch}-{os}-{abi}")
+    };
     eprintln!("zig target: {target}");
     c.arg(target);
     let optimize = match std::env::var("OPT_LEVEL").unwrap().as_str() {
