@@ -1,0 +1,13 @@
+[package]
+name = "lua-rt"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+zstd.workspace = true
+
+[build-dependencies]
+zstd.workspace = true

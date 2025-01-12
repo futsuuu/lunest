@@ -41,11 +41,7 @@ fn main() -> anyhow::Result<()> {
 #[test]
 fn test_lua() -> anyhow::Result<()> {
     std::env::set_current_dir("..")?;
-    if cfg!(feature = "luacmds-all") {
-        run_cmd(vec![], vec!["all".into()])
-    } else {
-        run_cmd(vec![], vec![])
-    }
+    run_cmd(vec![], vec!["all".into()])
 }
 
 fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {

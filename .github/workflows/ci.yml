@@ -30,10 +30,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - uses: mlugg/setup-zig@v1
+
       - name: cargo test
-        run: |
-          cargo test --workspace --all-targets
-          cargo test --features luacmds-all
+        run: cargo test --workspace --all-targets
 
   lint:
     runs-on: ubuntu-latest
@@ -49,11 +49,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - uses: mlugg/setup-zig@v1
+
       - name: cargo clippy
-        run: |
-          cargo clippy --workspace --all-targets
-          cargo clippy --features luacmds-all
-          cargo clippy --no-default-features
+        run: cargo clippy --workspace --all-targets
 
 
   style:
@@ -68,8 +67,13 @@ jobs:
         with:
           components: rustfmt
 
+      - uses: mlugg/setup-zig@v1
+
       - name: cargo fmt
         run: cargo fmt --all --check
+
+      - name: zig fmt
+        run: zig fmt --check .
 
       - name: stylua
         uses: JohnnyMorganz/stylua-action@v4
