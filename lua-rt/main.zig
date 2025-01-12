@@ -5,14 +5,17 @@ const ziglua = @import("ziglua");
 const Lua = ziglua.Lua;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const a = gpa.allocator();
+    const a = std.heap.c_allocator;
 
     var lua = try Lua.init(a);
     defer lua.deinit();
     lua.openLibs();
 
+    var args = if (builtin.os.tag == .windows)
+        try std.process.argsWithAllocator(a)
+    else
+        std.process.args();
+    defer args.deinit();
     var file_name: ?[:0]const u8 = null;
     {
         lua.createTable(2, 0);
@@ -20,11 +23,6 @@ pub fn main() !void {
             .lua51, .lua52, .luajit => i32,
             else => ziglua.Integer,
         } = -1;
-        var args = if (builtin.os.tag == .windows)
-            try std.process.argsWithAllocator(a)
-        else
-            std.process.args();
-        defer args.deinit();
         while (args.next()) |arg| {
             if (i == 0) file_name = arg;
             _ = lua.pushString(arg);
