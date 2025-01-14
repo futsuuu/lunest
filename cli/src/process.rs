@@ -9,7 +9,6 @@ pub struct Process<R: std::io::Read, W: std::io::Write> {
     inner: std::process::Child,
     input: W,
     output: line_reader::LineReader<R>,
-    _tempdir: Option<tempfile::TempDir>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -21,17 +20,18 @@ pub enum Error {
 }
 
 impl Process<std::fs::File, std::fs::File> {
-    pub fn spawn(profile: &crate::config::Profile) -> Result<Self, std::io::Error> {
-        let tempdir = tempfile::TempDir::with_prefix(env!("CARGO_BIN_NAME"))?;
-        let input_path = tempdir.path().join("in.jsonl");
-        let output_path = tempdir.path().join("out.jsonl");
+    pub fn spawn(
+        profile: &crate::config::Profile,
+        runtime_files: &mut crate::global::RuntimeFiles,
+    ) -> Result<Self, std::io::Error> {
+        let temp_dir = runtime_files.create_process_dir()?;
+        let input_path = temp_dir.join("in.jsonl");
+        let output_path = temp_dir.join("out.jsonl");
         Ok(Self {
             inner: {
-                let script = tempdir.path().join("main.lua");
-                std::fs::write(&script, include_str!(concat!(env!("OUT_DIR"), "/main.lua")))?;
                 profile
-                    .lua_command(tempdir.path())?
-                    .arg(script)
+                    .lua_command(runtime_files)?
+                    .arg(runtime_files.get_main_script())
                     .env("LUNEST_IN", &input_path)
                     .env("LUNEST_OUT", &output_path)
                     .spawn()?
@@ -44,7 +44,6 @@ impl Process<std::fs::File, std::fs::File> {
                 std::fs::write(&output_path, "")?;
                 std::fs::File::open(output_path)?
             }),
-            _tempdir: Some(tempdir),
         })
     }
 }

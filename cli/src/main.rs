@@ -1,4 +1,5 @@
 mod config;
+mod global;
 mod process;
 
 use std::io::Write;
@@ -63,12 +64,13 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
         ps
     };
 
+    let mut runtime_files = global::RuntimeFiles::new()?;
     let mut has_error = false;
     for (i, (profile_name, profile)) in profiles.iter().enumerate() {
         if i != 0 {
             println!();
         }
-        if !run(profile_name, profile, &root_dir)? {
+        if !run(profile_name, profile, &root_dir, &mut runtime_files)? {
             has_error = true;
         }
     }
@@ -82,10 +84,11 @@ fn run(
     profile_name: &str,
     profile: &config::Profile,
     root_dir: &std::path::Path,
+    runtime_files: &mut global::RuntimeFiles,
 ) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile_name.bold());
 
-    let mut process = process::Process::spawn(profile)?;
+    let mut process = process::Process::spawn(profile, runtime_files)?;
     process.write(&process::Input::Initialize {
         init_file: profile.init_file()?.map(ToOwned::to_owned),
         root_dir: root_dir.to_path_buf(),
