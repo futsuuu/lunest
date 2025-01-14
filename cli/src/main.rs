@@ -64,13 +64,13 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
         ps
     };
 
-    let mut runtime_files = global::RuntimeFiles::new()?;
+    let runtime_files = global::RuntimeFiles::new()?;
     let mut has_error = false;
     for (i, (profile_name, profile)) in profiles.iter().enumerate() {
         if i != 0 {
             println!();
         }
-        if !run(profile_name, profile, &root_dir, &mut runtime_files)? {
+        if !run(profile_name, profile, &root_dir, &runtime_files)? {
             has_error = true;
         }
     }
@@ -84,7 +84,7 @@ fn run(
     profile_name: &str,
     profile: &config::Profile,
     root_dir: &std::path::Path,
-    runtime_files: &mut global::RuntimeFiles,
+    runtime_files: &global::RuntimeFiles,
 ) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile_name.bold());
 

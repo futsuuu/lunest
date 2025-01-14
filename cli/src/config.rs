@@ -193,11 +193,11 @@ impl Default for Profile {
 impl Profile {
     pub fn lua_command(
         &self,
-        runtime_files: &mut crate::global::RuntimeFiles,
+        runtime_files: &crate::global::RuntimeFiles,
     ) -> std::io::Result<std::process::Command> {
         let lua = self.lua.as_ref().unwrap();
         let program = lua.first().unwrap(); // already validated in [`Config::profile`]
-        let mut cmd = std::process::Command::new(runtime_files.get_lua_program(program)?);
+        let mut cmd = std::process::Command::new(&*runtime_files.get_lua_program(program)?);
         cmd.args(lua.get(1..).unwrap_or_default());
         Ok(cmd)
     }

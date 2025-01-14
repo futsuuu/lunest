@@ -22,7 +22,7 @@ pub enum Error {
 impl Process<std::fs::File, std::fs::File> {
     pub fn spawn(
         profile: &crate::config::Profile,
-        runtime_files: &mut crate::global::RuntimeFiles,
+        runtime_files: &crate::global::RuntimeFiles,
     ) -> Result<Self, std::io::Error> {
         let temp_dir = runtime_files.create_process_dir()?;
         let input_path = temp_dir.join("in.jsonl");

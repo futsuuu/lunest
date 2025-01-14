@@ -1,8 +1,10 @@
 pub struct RuntimeFiles {
-    inner: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
     main_script: std::path::PathBuf,
-    lua_programs: std::collections::HashMap<std::ffi::OsString, std::ffi::OsString>,
-    process_dir_counter: usize,
+    lua_programs: std::cell::RefCell<
+        std::collections::HashMap<std::rc::Rc<std::ffi::OsString>, std::rc::Rc<std::ffi::OsString>>,
+    >,
+    process_dir_counter: std::cell::Cell<usize>,
 }
 
 impl RuntimeFiles {
@@ -14,17 +16,18 @@ impl RuntimeFiles {
             include_str!(concat!(env!("OUT_DIR"), "/main.lua")),
         )?;
         Ok(Self {
-            inner: temp_dir,
+            temp_dir,
             main_script,
-            lua_programs: std::collections::HashMap::new(),
-            process_dir_counter: 0,
+            lua_programs: std::cell::RefCell::new(std::collections::HashMap::new()),
+            process_dir_counter: std::cell::Cell::new(0),
         })
     }
 
-    pub fn create_process_dir(&mut self) -> std::io::Result<std::path::PathBuf> {
-        let name = format!("p{:x}", self.process_dir_counter);
-        self.process_dir_counter += 1;
-        let dir = self.inner.path().join(name);
+    pub fn create_process_dir(&self) -> std::io::Result<std::path::PathBuf> {
+        let counter = self.process_dir_counter.get();
+        let name = format!("p{:x}", counter);
+        self.process_dir_counter.set(counter + 1);
+        let dir = self.temp_dir.path().join(name);
         std::fs::create_dir(&dir)?;
         Ok(dir)
     }
@@ -34,23 +37,25 @@ impl RuntimeFiles {
     }
 
     pub fn get_lua_program(
-        &mut self,
+        &self,
         name: impl Into<std::ffi::OsString>,
-    ) -> std::io::Result<std::ffi::OsString> {
-        let name = name.into();
-        if let Some(program) = self.lua_programs.get(&name) {
-            return Ok(program.clone());
+    ) -> std::io::Result<impl std::ops::Deref<Target = std::ffi::OsString>> {
+        let name = std::rc::Rc::new(name.into());
+        if let Some(program) = self.lua_programs.borrow().get(&name) {
+            return Ok(std::rc::Rc::clone(program));
         }
-        let program = if let Ok(path) = which::which(&name) {
-            path.into_os_string()
-        } else if let Some(lua) = lua_rt::Lua::from_program_name(&name) {
-            let path = self.inner.path().join(lua.recommended_program_name());
+        let program = if let Ok(path) = which::which(&*name) {
+            std::rc::Rc::new(path.into())
+        } else if let Some(lua) = lua_rt::Lua::from_program_name(&*name) {
+            let path = self.temp_dir.path().join(lua.recommended_program_name());
             lua.write(&path)?;
-            path.into_os_string()
+            std::rc::Rc::new(path.into())
         } else {
-            name.clone()
+            std::rc::Rc::clone(&name)
         };
-        self.lua_programs.insert(name.clone(), program.clone());
+        self.lua_programs
+            .borrow_mut()
+            .insert(name, std::rc::Rc::clone(&program));
         Ok(program)
     }
 }
