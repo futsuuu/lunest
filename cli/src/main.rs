@@ -48,29 +48,26 @@ fn test_lua() -> anyhow::Result<()> {
 fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
     let cx = global::Context::new()?;
 
-    let config = config::Config::read(cx.root_dir())?;
     let profiles = {
-        let mut ps = indexmap::IndexMap::new();
+        let mut ps = Vec::new();
         for profile in &profiles {
-            let (s, p) = config.profile(Some(profile))?;
-            ps.insert(s, p);
+            ps.push(cx.config().profile(profile)?);
         }
         for group in &groups {
-            ps.extend(config.group(group)?);
+            ps.extend(cx.config().group(group)?);
         }
         if ps.is_empty() {
-            let (s, p) = config.profile(None)?;
-            ps.insert(s, p);
+            ps.push(cx.config().default_profile()?);
         }
         ps
     };
 
     let mut has_error = false;
-    for (i, (profile_name, profile)) in profiles.iter().enumerate() {
+    for (i, profile) in profiles.iter().enumerate() {
         if i != 0 {
             println!();
         }
-        if !run(&cx, profile_name, profile)? {
+        if !run(&cx, profile)? {
             has_error = true;
         }
     }
@@ -80,21 +77,17 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run(
-    cx: &global::Context,
-    profile_name: &str,
-    profile: &config::Profile,
-) -> anyhow::Result<bool> {
-    println!("run with profile '{}'", profile_name.bold());
+fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> {
+    println!("run with profile '{}'", profile.name().bold());
 
     let mut process = process::Process::spawn(cx, profile)?;
     process.write(&process::Input::Initialize {
-        init_file: profile.init_file()?.map(ToOwned::to_owned),
+        init_file: profile.init_script().clone(),
         root_dir: cx.root_dir().to_path_buf(),
         target_files: profile
-            .target_files(cx.root_dir())?
-            .into_iter()
-            .map(|p| process::TargetFile::new(p, cx.root_dir()))
+            .target_files()
+            .iter()
+            .map(|p| process::TargetFile::new(p.clone(), cx.root_dir()))
             .collect(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;
