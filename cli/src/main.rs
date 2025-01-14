@@ -46,8 +46,9 @@ fn test_lua() -> anyhow::Result<()> {
 }
 
 fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
-    let root_dir = std::env::current_dir()?;
-    let config = config::Config::read(&root_dir)?;
+    let cx = global::Context::new()?;
+
+    let config = config::Config::read(cx.root_dir())?;
     let profiles = {
         let mut ps = indexmap::IndexMap::new();
         for profile in &profiles {
@@ -64,13 +65,12 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
         ps
     };
 
-    let cx = global::Context::new()?;
     let mut has_error = false;
     for (i, (profile_name, profile)) in profiles.iter().enumerate() {
         if i != 0 {
             println!();
         }
-        if !run(&cx, profile_name, profile, &root_dir)? {
+        if !run(&cx, profile_name, profile)? {
             has_error = true;
         }
     }
@@ -84,18 +84,17 @@ fn run(
     cx: &global::Context,
     profile_name: &str,
     profile: &config::Profile,
-    root_dir: &std::path::Path,
 ) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile_name.bold());
 
     let mut process = process::Process::spawn(cx, profile)?;
     process.write(&process::Input::Initialize {
         init_file: profile.init_file()?.map(ToOwned::to_owned),
-        root_dir: root_dir.to_path_buf(),
+        root_dir: cx.root_dir().to_path_buf(),
         target_files: profile
-            .target_files(root_dir)?
+            .target_files(cx.root_dir())?
             .into_iter()
-            .map(|p| process::TargetFile::new(p, root_dir))
+            .map(|p| process::TargetFile::new(p, cx.root_dir()))
             .collect(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;

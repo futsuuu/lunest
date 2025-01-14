@@ -1,4 +1,6 @@
 pub struct Context {
+    root_dir: std::path::PathBuf,
+
     temp_dir: tempfile::TempDir,
     main_script: std::path::PathBuf,
     lua_programs: std::cell::RefCell<
@@ -16,11 +18,16 @@ impl Context {
             include_str!(concat!(env!("OUT_DIR"), "/main.lua")),
         )?;
         Ok(Self {
+            root_dir: std::env::current_dir()?,
             temp_dir,
             main_script,
             lua_programs: std::cell::RefCell::new(std::collections::HashMap::new()),
             process_dir_counter: std::cell::Cell::new(0),
         })
+    }
+
+    pub fn root_dir(&self) -> &std::path::Path {
+        &self.root_dir
     }
 
     pub fn create_process_dir(&self) -> std::io::Result<std::path::PathBuf> {
