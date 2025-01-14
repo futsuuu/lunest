@@ -64,13 +64,13 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
         ps
     };
 
-    let runtime_files = global::RuntimeFiles::new()?;
+    let cx = global::Context::new()?;
     let mut has_error = false;
     for (i, (profile_name, profile)) in profiles.iter().enumerate() {
         if i != 0 {
             println!();
         }
-        if !run(profile_name, profile, &root_dir, &runtime_files)? {
+        if !run(&cx, profile_name, profile, &root_dir)? {
             has_error = true;
         }
     }
@@ -81,14 +81,14 @@ fn run_cmd(profiles: Vec<String>, groups: Vec<String>) -> anyhow::Result<()> {
 }
 
 fn run(
+    cx: &global::Context,
     profile_name: &str,
     profile: &config::Profile,
     root_dir: &std::path::Path,
-    runtime_files: &global::RuntimeFiles,
 ) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile_name.bold());
 
-    let mut process = process::Process::spawn(profile, runtime_files)?;
+    let mut process = process::Process::spawn(cx, profile)?;
     process.write(&process::Input::Initialize {
         init_file: profile.init_file()?.map(ToOwned::to_owned),
         root_dir: root_dir.to_path_buf(),

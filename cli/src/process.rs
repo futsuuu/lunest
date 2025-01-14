@@ -21,17 +21,17 @@ pub enum Error {
 
 impl Process<std::fs::File, std::fs::File> {
     pub fn spawn(
+        cx: &crate::global::Context,
         profile: &crate::config::Profile,
-        runtime_files: &crate::global::RuntimeFiles,
     ) -> Result<Self, std::io::Error> {
-        let temp_dir = runtime_files.create_process_dir()?;
+        let temp_dir = cx.create_process_dir()?;
         let input_path = temp_dir.join("in.jsonl");
         let output_path = temp_dir.join("out.jsonl");
         Ok(Self {
             inner: {
                 profile
-                    .lua_command(runtime_files)?
-                    .arg(runtime_files.get_main_script())
+                    .lua_command(cx)?
+                    .arg(cx.get_main_script())
                     .env("LUNEST_IN", &input_path)
                     .env("LUNEST_OUT", &output_path)
                     .spawn()?

@@ -1,4 +1,4 @@
-pub struct RuntimeFiles {
+pub struct Context {
     temp_dir: tempfile::TempDir,
     main_script: std::path::PathBuf,
     lua_programs: std::cell::RefCell<
@@ -7,7 +7,7 @@ pub struct RuntimeFiles {
     process_dir_counter: std::cell::Cell<usize>,
 }
 
-impl RuntimeFiles {
+impl Context {
     pub fn new() -> std::io::Result<Self> {
         let temp_dir = tempfile::TempDir::with_prefix(env!("CARGO_PKG_NAME"))?;
         let main_script = temp_dir.path().join("main.lua");
