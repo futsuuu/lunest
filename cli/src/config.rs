@@ -21,17 +21,20 @@ impl Default for ProfileSpec {
         static DEFAULT: std::sync::OnceLock<ProfileSpec> = std::sync::OnceLock::new();
         let default = DEFAULT.get_or_init(|| Self {
             lua: Some(vec!["lua".into()]),
-            include: Some(
-                globset::GlobSet::builder()
-                    .add(globset::Glob::new("{src,lua}/**/*.lua").unwrap())
-                    .build()
-                    .unwrap(),
-            ),
+            include: Some(build_globset(&["{src,lua}/**/*.lua"]).unwrap()),
             exclude: Some(globset::GlobSet::empty()),
             init: None,
         });
         default.clone()
     }
+}
+
+fn build_globset(patterns: &[&str]) -> Result<globset::GlobSet, globset::Error> {
+    let mut builder = globset::GlobSetBuilder::new();
+    for glob in patterns {
+        builder.add(globset::Glob::new(glob)?);
+    }
+    builder.build()
 }
 
 #[derive(Default)]
@@ -111,6 +114,7 @@ impl Config {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Profile {
     name: String,
     init_script: Option<std::path::PathBuf>,
@@ -146,15 +150,22 @@ impl Profile {
         spec: ProfileSpec,
         root_dir: &std::path::Path,
     ) -> anyhow::Result<Self> {
-        let lua = spec.lua.as_ref().unwrap();
+        let init_script = spec.init.map(|mut path| {
+            if path.is_relative() {
+                path = root_dir.join(path);
+            }
+            std::fs::canonicalize(&path).unwrap_or(path)
+        });
         let target_files = target_files(
+            root_dir,
             &spec.include.unwrap_or_default(),
             &spec.exclude.unwrap_or_default(),
-            root_dir,
+            init_script.as_ref(),
         )?;
+        let lua = spec.lua.as_ref().unwrap();
         Ok(Self {
             name,
-            init_script: spec.init,
+            init_script,
             target_files,
             lua_program: lua.first().context("'lua' field is empty")?.to_string(),
             lua_args: lua.get(1..).unwrap_or_default().to_vec(),
@@ -163,9 +174,10 @@ impl Profile {
 }
 
 fn target_files(
+    root_dir: &std::path::Path,
     include: &globset::GlobSet,
     exclude: &globset::GlobSet,
-    root_dir: &std::path::Path,
+    init_script: Option<&std::path::PathBuf>,
 ) -> std::io::Result<Vec<std::path::PathBuf>> {
     let mut r = Vec::new();
     for entry in walkdir::WalkDir::new(root_dir)
@@ -174,7 +186,7 @@ fn target_files(
         .into_iter()
         .filter_entry(|entry| {
             let path = entry.path().strip_prefix(root_dir).unwrap();
-            if exclude.is_match(path) {
+            if exclude.is_match(path) || init_script.is_some_and(|init| init == path) {
                 false
             } else if entry.file_type().is_dir() {
                 true
@@ -189,4 +201,86 @@ fn target_files(
         }
     }
     Ok(r)
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+
+    use rstest::{fixture, rstest};
+
+    #[fixture]
+    #[once]
+    fn root_dir() -> tempfile::TempDir {
+        let temp_dir = tempfile::tempdir().unwrap();
+        for s in ["lua", "test", "foo"] {
+            std::fs::create_dir_all(temp_dir.path().join(s)).unwrap();
+        }
+        for s in [
+            "lua/hello.lua",
+            "lua/world.lua",
+            "foo/a.lua",
+            "test/abc.lua",
+            "test/bcd.lua",
+        ] {
+            std::fs::write(temp_dir.path().join(s), "").unwrap();
+        }
+        temp_dir
+    }
+
+    #[rstest]
+    fn lua_command_ok(root_dir: &tempfile::TempDir) {
+        let spec = ProfileSpec {
+            lua: Some(vec!["foo".into(), "hello world".into(), "!".into()]),
+            ..Default::default()
+        };
+        let p = Profile::from_spec("name".into(), spec, root_dir.path()).unwrap();
+        assert_eq!(String::from("foo"), p.lua_program);
+        assert_eq!(
+            vec![String::from("hello world"), String::from("!")],
+            p.lua_args
+        );
+    }
+
+    #[rstest]
+    fn lua_command_error(root_dir: &tempfile::TempDir) {
+        let spec = ProfileSpec {
+            lua: Some(Vec::new()),
+            ..Default::default()
+        };
+        assert!(Profile::from_spec("name".into(), spec, root_dir.path()).is_err());
+    }
+
+    #[rstest]
+    fn include_and_exclude(root_dir: &tempfile::TempDir) -> anyhow::Result<()> {
+        let root = root_dir.path();
+        assert_eq!(
+            vec![
+                root.join("lua").join("world.lua"),
+                root.join("test").join("abc.lua"),
+            ],
+            target_files(
+                root,
+                &build_globset(&["lua/**/*.lua", "test/a*.lua"])?,
+                &build_globset(&["lua/hello.lua"])?,
+                None,
+            )?,
+        );
+        Ok(())
+    }
+
+    #[rstest]
+    fn exclude_init_script(root_dir: &tempfile::TempDir) -> anyhow::Result<()> {
+        let root = root_dir.path();
+        assert_eq!(
+            vec![root.join("test").join("bcd.lua")],
+            target_files(
+                root,
+                &build_globset(&["test/**/*.lua"])?,
+                &build_globset(&[])?,
+                Some(&std::path::PathBuf::from("test/abc.lua")),
+            )?,
+        );
+        Ok(())
+    }
 }
