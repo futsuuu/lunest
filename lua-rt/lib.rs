@@ -120,7 +120,10 @@ mod tests {
             .arg(t.path().join("a.lua"))
             .output()?;
         assert!(out.status.success());
+        #[cfg(unix)]
         assert_eq!(out.stdout, Vec::from(format!("{version}\n")));
+        #[cfg(windows)]
+        assert_eq!(out.stdout, Vec::from(format!("{version}\r\n")));
         Ok(())
     }
 }
