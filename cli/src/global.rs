@@ -1,5 +1,4 @@
 pub struct Context {
-    root_dir: std::path::PathBuf,
     config: crate::config::Config,
 
     temp_dir: tempfile::TempDir,
@@ -12,8 +11,7 @@ pub struct Context {
 
 impl Context {
     pub fn new() -> anyhow::Result<Self> {
-        let root_dir = std::env::current_dir()?;
-        let config = crate::config::Config::read(&root_dir)?;
+        let config = crate::config::Config::read()?;
         let temp_dir = tempfile::TempDir::with_prefix(env!("CARGO_PKG_NAME"))?;
         let main_script = temp_dir.path().join("main.lua");
         std::fs::write(
@@ -21,7 +19,6 @@ impl Context {
             include_str!(concat!(env!("OUT_DIR"), "/main.lua")),
         )?;
         Ok(Self {
-            root_dir,
             config,
             temp_dir,
             main_script,
@@ -31,7 +28,7 @@ impl Context {
     }
 
     pub fn root_dir(&self) -> &std::path::Path {
-        &self.root_dir
+        self.config.root_dir()
     }
 
     pub fn config(&self) -> &crate::config::Config {

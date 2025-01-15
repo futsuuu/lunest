@@ -37,22 +37,28 @@ fn build_globset(patterns: &[&str]) -> Result<globset::GlobSet, globset::Error> 
     builder.build()
 }
 
-#[derive(Default)]
 pub struct Config {
+    root_dir: std::path::PathBuf,
     profiles: std::collections::HashMap<String, std::rc::Rc<Profile>>,
     groups: std::collections::HashMap<String, Vec<std::rc::Rc<Profile>>>,
 }
 
 impl Config {
-    pub fn read(root_dir: &std::path::Path) -> anyhow::Result<Self> {
-        if let Some(path) = [root_dir.join("lunest.toml"), root_dir.join(".lunest.toml")]
-            .into_iter()
-            .find(|p| p.exists())
-        {
+    pub fn read() -> anyhow::Result<Self> {
+        let (root_dir, config_file) = find_config_file(std::env::current_dir()?);
+        if let Some(path) = config_file {
             Self::from_spec(toml::from_str(&std::fs::read_to_string(path)?)?, root_dir)
         } else {
-            Ok(Self::default())
+            Ok(Self {
+                root_dir,
+                profiles: std::collections::HashMap::new(),
+                groups: std::collections::HashMap::new(),
+            })
         }
+    }
+
+    pub fn root_dir(&self) -> &std::path::Path {
+        &self.root_dir
     }
 
     pub fn profile(&self, name: &str) -> anyhow::Result<&Profile> {
@@ -80,7 +86,7 @@ impl Config {
         Ok(group.iter().map(std::rc::Rc::as_ref))
     }
 
-    fn from_spec(config_spec: ConfigSpec, root_dir: &std::path::Path) -> anyhow::Result<Self> {
+    fn from_spec(config_spec: ConfigSpec, root_dir: std::path::PathBuf) -> anyhow::Result<Self> {
         let profiles = {
             let mut profiles = std::collections::HashMap::new();
             let default_spec = if let Some(mut spec) = config_spec.profile.get("default").cloned() {
@@ -91,7 +97,7 @@ impl Config {
             };
             for (name, mut spec) in config_spec.profile {
                 spec.merge(default_spec.clone());
-                let profile = Profile::from_spec(name.clone(), spec, root_dir)?;
+                let profile = Profile::from_spec(name.clone(), spec, &root_dir)?;
                 profiles.insert(name, profile.into());
             }
             profiles
@@ -110,7 +116,59 @@ impl Config {
             }
             groups
         };
-        Ok(Self { profiles, groups })
+        Ok(Self {
+            root_dir,
+            profiles,
+            groups,
+        })
+    }
+}
+
+fn find_config_file(cwd: std::path::PathBuf) -> (std::path::PathBuf, Option<std::path::PathBuf>) {
+    let mut dir = cwd.as_path();
+    loop {
+        if let Some(config) = [dir.join("lunest.toml"), dir.join(".lunest.toml")]
+            .into_iter()
+            .find(|p| p.exists())
+        {
+            break (dir.to_path_buf(), Some(config));
+        }
+        let Some(parent) = dir.parent() else {
+            break (cwd, None);
+        };
+        dir = parent;
+    }
+}
+
+#[cfg(test)]
+mod find_config_file_tests {
+    use super::*;
+
+    #[test]
+    fn found() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let cwd = temp_dir.path().join("a/b/c");
+        std::fs::create_dir_all(&cwd)?;
+        for s in ["a/lunest.toml", "a/b/lunest.toml", "a/b/.lunest.toml"] {
+            std::fs::write(temp_dir.path().join(s), "")?;
+        }
+        assert_eq!(
+            (
+                temp_dir.path().join("a").join("b"),
+                Some(temp_dir.path().join("a").join("b").join("lunest.toml"))
+            ),
+            find_config_file(cwd)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn not_found() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let cwd = temp_dir.path().join("a/b/c");
+        std::fs::create_dir_all(&cwd)?;
+        assert_eq!((cwd.clone(), None), find_config_file(cwd));
+        Ok(())
     }
 }
 
