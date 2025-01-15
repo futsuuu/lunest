@@ -93,7 +93,7 @@ mod tests {
     #[case(Some(Lua::Lua54), "lua5.4")]
     #[case(None, "lua5.0")]
     #[cfg_attr(unix, case(None, "lua5.1.exe"))]
-    #[cfg_attr(windows, case(Some(Lua51), "lua5.1.exe"))]
+    #[cfg_attr(windows, case(Some(Lua::Lua51), "lua5.1.exe"))]
     fn from_program_name(#[case] lua: Option<Lua>, #[case] program: &str) {
         assert_eq!(lua, Lua::from_program_name(program));
     }
