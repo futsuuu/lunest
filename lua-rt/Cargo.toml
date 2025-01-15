@@ -9,5 +9,9 @@ path = "lib.rs"
 [dependencies]
 zstd.workspace = true
 
+[dev-dependencies]
+rstest = { version = "0.24", default-features = false }
+tempfile.workspace = true
+
 [build-dependencies]
 zstd.workspace = true

@@ -268,7 +268,6 @@ mod profile_tests {
     use rstest::{fixture, rstest};
 
     #[fixture]
-    #[once]
     fn root_dir() -> tempfile::TempDir {
         let temp_dir = tempfile::tempdir().unwrap();
         for s in ["lua", "test", "foo"] {
@@ -287,7 +286,7 @@ mod profile_tests {
     }
 
     #[rstest]
-    fn lua_command_ok(root_dir: &tempfile::TempDir) {
+    fn lua_command_ok(root_dir: tempfile::TempDir) {
         let spec = ProfileSpec {
             lua: Some(vec!["foo".into(), "hello world".into(), "!".into()]),
             ..Default::default()
@@ -301,7 +300,7 @@ mod profile_tests {
     }
 
     #[rstest]
-    fn lua_command_error(root_dir: &tempfile::TempDir) {
+    fn lua_command_error(root_dir: tempfile::TempDir) {
         let spec = ProfileSpec {
             lua: Some(Vec::new()),
             ..Default::default()
@@ -310,7 +309,7 @@ mod profile_tests {
     }
 
     #[rstest]
-    fn include_and_exclude(root_dir: &tempfile::TempDir) -> anyhow::Result<()> {
+    fn include_and_exclude(root_dir: tempfile::TempDir) -> anyhow::Result<()> {
         let root = root_dir.path();
         assert_eq!(
             vec![
@@ -328,7 +327,7 @@ mod profile_tests {
     }
 
     #[rstest]
-    fn exclude_init_script(root_dir: &tempfile::TempDir) -> anyhow::Result<()> {
+    fn exclude_init_script(root_dir: tempfile::TempDir) -> anyhow::Result<()> {
         let root = root_dir.path();
         assert_eq!(
             vec![root.join("test").join("bcd.lua")],
