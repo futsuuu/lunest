@@ -1,258 +1,286 @@
-use std::path::{Path, PathBuf};
-
-use anyhow::{Context, Result};
+use anyhow::Context;
 use merge::Merge;
-use serde::Deserialize;
 
-#[derive(Debug, Default, Deserialize, PartialEq)]
+#[derive(Debug, Default, serde::Deserialize)]
 #[serde(default)]
-pub struct Config {
+struct ConfigSpec {
     group: std::collections::HashMap<String, Vec<String>>,
-    profile: std::collections::HashMap<String, Profile>,
+    profile: std::collections::HashMap<String, ProfileSpec>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, Merge)]
+struct ProfileSpec {
+    lua: Option<Vec<String>>,
+    include: Option<globset::GlobSet>,
+    exclude: Option<globset::GlobSet>,
+    init: Option<std::path::PathBuf>,
+}
+
+impl Default for ProfileSpec {
+    fn default() -> Self {
+        static DEFAULT: std::sync::OnceLock<ProfileSpec> = std::sync::OnceLock::new();
+        let default = DEFAULT.get_or_init(|| Self {
+            lua: Some(vec!["lua".into()]),
+            include: Some(build_globset(&["{src,lua}/**/*.lua"]).unwrap()),
+            exclude: Some(globset::GlobSet::empty()),
+            init: None,
+        });
+        default.clone()
+    }
+}
+
+fn build_globset(patterns: &[&str]) -> Result<globset::GlobSet, globset::Error> {
+    let mut builder = globset::GlobSetBuilder::new();
+    for glob in patterns {
+        builder.add(globset::Glob::new(glob)?);
+    }
+    builder.build()
+}
+
+#[derive(Default)]
+pub struct Config {
+    profiles: std::collections::HashMap<String, std::rc::Rc<Profile>>,
+    groups: std::collections::HashMap<String, Vec<std::rc::Rc<Profile>>>,
 }
 
 impl Config {
-    pub fn read(root_dir: &Path) -> Result<Config> {
-        let paths = [
-            root_dir.join(".config").join("lunest.toml"),
-            root_dir.join("lunest.toml"),
-            root_dir.join(".lunest.toml"),
-        ];
-        let config = if let Some(s) = paths.iter().find_map(|p| std::fs::read_to_string(p).ok()) {
-            toml::from_str(&s)?
+    pub fn read(root_dir: &std::path::Path) -> anyhow::Result<Self> {
+        if let Some(path) = [root_dir.join("lunest.toml"), root_dir.join(".lunest.toml")]
+            .into_iter()
+            .find(|p| p.exists())
+        {
+            Self::from_spec(toml::from_str(&std::fs::read_to_string(path)?)?, root_dir)
         } else {
-            Self::default()
-        };
-        Ok(config)
-    }
-
-    pub fn profile<'a>(&'a self, name: Option<&'a str>) -> Result<(&'a str, Profile)> {
-        let (name, mut profile) = if let Some(name) = name {
-            let mut profile = self
-                .profile
-                .get(name)
-                .with_context(|| format!("profile '{name}' is not defined"))?
-                .clone();
-            if let Some(default) = self.profile.get("default") {
-                profile.merge(default.clone());
-            }
-            (name, profile)
-        } else if self.profile.is_empty() {
-            return Ok(("default", Profile::default()));
-        } else if self.profile.keys().nth(1).is_none() {
-            let (name, profile) = self.profile.iter().next().unwrap();
-            (name.as_str(), profile.clone())
-        } else if let Some(default) = self.profile.get("default") {
-            ("default", default.clone())
-        } else {
-            anyhow::bail!("you must specify the profile or define a 'default' profile");
-        };
-
-        if let (Some(exclude), Some(path)) = (profile.exclude.as_mut(), profile.init.as_ref()) {
-            exclude.push(path.display().to_string());
+            Ok(Self::default())
         }
-        profile.merge(Profile::default());
-
-        anyhow::ensure!(
-            !profile.lua.as_ref().unwrap().is_empty(),
-            "lua command is empty"
-        );
-
-        Ok((name, profile))
     }
 
-    pub fn group<'a>(&'a self, name: &'a str) -> Result<indexmap::IndexMap<&'a str, Profile>> {
-        let mut profiles = indexmap::IndexMap::new();
-        self.group_inner(name, &mut profiles, &mut std::collections::HashSet::new())?;
-        Ok(profiles)
+    pub fn profile(&self, name: &str) -> anyhow::Result<&Profile> {
+        let profile = self
+            .profiles
+            .get(name)
+            .with_context(|| format!("profile '{name}' is not defined"))?;
+        Ok(profile)
     }
 
-    fn group_inner<'a>(
-        &'a self,
-        name: &'a str,
-        profiles: &mut indexmap::IndexMap<&'a str, Profile>,
-        visited_groups: &mut std::collections::HashSet<&'a str>,
-    ) -> Result<()> {
-        let members = self
-            .group
+    pub fn default_profile(&self) -> anyhow::Result<&Profile> {
+        if let Some(profile) = self.profiles.get("default") {
+            return Ok(profile);
+        } else if self.profiles.len() == 1 {
+            return Ok(self.profiles.values().next().unwrap());
+        }
+        anyhow::bail!("you must specify the profile or define a 'default' profile");
+    }
+
+    pub fn group(&self, name: &str) -> anyhow::Result<impl Iterator<Item = &Profile>> {
+        let group = self
+            .groups
             .get(name)
             .with_context(|| format!("group '{name}' is not defined"))?;
-        if !visited_groups.insert(name) {
-            return Ok(());
-        }
-        for member in members {
-            if let Ok((s, p)) = self.profile(Some(member)) {
-                profiles.insert(s, p);
-            } else if self.group_inner(member, profiles, visited_groups).is_err() {
-                anyhow::bail!("profile or group '{member}' is not defined");
+        Ok(group.iter().map(std::rc::Rc::as_ref))
+    }
+
+    fn from_spec(config_spec: ConfigSpec, root_dir: &std::path::Path) -> anyhow::Result<Self> {
+        let profiles = {
+            let mut profiles = std::collections::HashMap::new();
+            let default_spec = if let Some(mut spec) = config_spec.profile.get("default").cloned() {
+                spec.merge(ProfileSpec::default());
+                spec
+            } else {
+                ProfileSpec::default()
+            };
+            for (name, mut spec) in config_spec.profile {
+                spec.merge(default_spec.clone());
+                let profile = Profile::from_spec(name.clone(), spec, root_dir)?;
+                profiles.insert(name, profile.into());
             }
-        }
-        Ok(())
+            profiles
+        };
+        let groups = {
+            let mut groups = std::collections::HashMap::new();
+            for (name, group_spec) in config_spec.group {
+                let mut group = Vec::new();
+                for member in group_spec {
+                    let profile = profiles
+                        .get(&member)
+                        .with_context(|| format!("profile '{member}' is not defined"))?;
+                    group.push(std::rc::Rc::clone(profile));
+                }
+                groups.insert(name, group);
+            }
+            groups
+        };
+        Ok(Self { profiles, groups })
     }
 }
 
-#[cfg(test)]
-mod config_tests {
-    use super::*;
-
-    #[test]
-    fn use_default_profile_if_empty() {
-        let c: Config = toml::from_str("").unwrap();
-        assert_eq!(("default", Profile::default()), c.profile(None).unwrap());
-    }
-
-    #[test]
-    fn detect_profile_from_one_profile() {
-        let c: Config = toml::from_str(
-            "[profile.a]
-            init = 'a.lua'",
-        )
-        .unwrap();
-        let (s, p) = c.profile(None).unwrap();
-        assert_eq!(s, "a");
-        assert_eq!(
-            p,
-            Profile {
-                init: Some(PathBuf::from("a.lua")),
-                ..Default::default()
-            },
-        );
-    }
-
-    #[test]
-    fn detect_profile_from_multiple_profiles() {
-        let c: Config = toml::from_str(
-            "[profile.a]
-            [profile.b]",
-        )
-        .unwrap();
-        assert!(c.profile(None).is_err());
-    }
-
-    #[test]
-    fn merge_default_profile() {
-        let c: Config = toml::from_str(
-            "[profile.default]
-            init = 'a.lua'
-            lua = ['lua']
-            [profile.a]
-            lua = ['lua5.1']",
-        )
-        .unwrap();
-        let (s, p) = c.profile(Some("a")).unwrap();
-        assert_eq!(s, "a");
-        assert_eq!(
-            p,
-            Profile {
-                init: Some(PathBuf::from("a.lua")),
-                lua: Some(vec!["lua5.1".into()]),
-                ..Default::default()
-            }
-        );
-    }
-
-    #[test]
-    fn get_profiles_from_circular_referenced_group() {
-        let c: Config = toml::from_str(
-            "[group]
-            a = ['b', 'd']
-            b = ['a', 'c']
-            [profile.c]
-            [profile.d]",
-        )
-        .unwrap();
-        assert_eq!(
-            indexmap::indexmap! {
-                "c" => Profile::default(),
-                "d" => Profile::default(),
-            },
-            c.group("a").unwrap(),
-        );
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Merge, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Profile {
-    lua: Option<Vec<String>>,
-    include: Option<Vec<String>>,
-    exclude: Option<Vec<String>>,
-    init: Option<PathBuf>,
-}
-
-impl Default for Profile {
-    fn default() -> Self {
-        Self {
-            lua: Some(vec!["lua".into()]),
-            include: Some(vec!["{src,lua}/**/*.lua".into()]),
-            exclude: Some(vec![]),
-            init: None,
-        }
-    }
+    name: String,
+    init_script: Option<std::path::PathBuf>,
+    target_files: Vec<std::path::PathBuf>,
+    lua_program: String,
+    lua_args: Vec<String>,
 }
 
 impl Profile {
-    pub fn lua_command(&self, temp_dir: &Path) -> std::io::Result<std::process::Command> {
-        let lua = self.lua.as_ref().unwrap();
-        let program = lua.first().unwrap(); // already validated in [`Config::profile`]
-        let mut cmd = match (
-            which::which(program),
-            lua_rt::Lua::from_program_name(program),
-        ) {
-            (Ok(p), _) => std::process::Command::new(p),
-            (Err(_), Some(c)) => {
-                let p = temp_dir.join(c.recommended_program_name());
-                c.write(&p)?;
-                std::process::Command::new(p)
-            }
-            _ => std::process::Command::new(program),
-        };
-        cmd.args(lua.get(1..).unwrap_or_default());
-        Ok(cmd)
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub fn target_files(&self, root_dir: &Path) -> Result<Vec<PathBuf>> {
-        let include = build_globset(self.include.as_ref().unwrap())?;
-        let exclude = build_globset(self.exclude.as_ref().unwrap())?;
-        let mut r = Vec::new();
-        for entry in walkdir::WalkDir::new(root_dir)
-            .follow_links(true)
-            .sort_by_file_name()
-            .into_iter()
-            .filter_entry(|entry| {
-                let path = entry.path().strip_prefix(root_dir).unwrap();
-                if exclude.is_match(path) {
-                    false
-                } else if entry.file_type().is_dir() {
-                    true
-                } else {
-                    include.is_match(path)
-                }
-            })
-        {
-            let entry = entry?;
-            if entry.file_type().is_file() {
-                r.push(entry.into_path())
-            }
-        }
-        Ok(r)
+    pub fn init_script(&self) -> &Option<std::path::PathBuf> {
+        &self.init_script
     }
 
-    pub fn init_file(&self) -> Result<Option<&Path>> {
-        if let Some(path) = self.init.as_ref() {
-            anyhow::ensure!(
-                path.exists(),
-                "init file `{}` does not exist",
-                path.display(),
-            );
-        }
-        Ok(self.init.as_deref())
+    pub fn target_files(&self) -> &[std::path::PathBuf] {
+        &self.target_files
+    }
+
+    pub fn lua_command(
+        &self,
+        cx: &crate::global::Context,
+    ) -> std::io::Result<std::process::Command> {
+        let mut c = std::process::Command::new(&*cx.get_lua_program(&self.lua_program)?);
+        c.args(&self.lua_args);
+        Ok(c)
+    }
+
+    fn from_spec(
+        name: String,
+        spec: ProfileSpec,
+        root_dir: &std::path::Path,
+    ) -> anyhow::Result<Self> {
+        let init_script = spec.init.map(|mut path| {
+            if path.is_relative() {
+                path = root_dir.join(path);
+            }
+            std::fs::canonicalize(&path).unwrap_or(path)
+        });
+        let target_files = target_files(
+            root_dir,
+            &spec.include.unwrap_or_default(),
+            &spec.exclude.unwrap_or_default(),
+            init_script.as_ref(),
+        )?;
+        let lua = spec.lua.as_ref().unwrap();
+        Ok(Self {
+            name,
+            init_script,
+            target_files,
+            lua_program: lua.first().context("'lua' field is empty")?.to_string(),
+            lua_args: lua.get(1..).unwrap_or_default().to_vec(),
+        })
     }
 }
 
-fn build_globset(patterns: &[String]) -> Result<globset::GlobSet> {
-    let mut builder = globset::GlobSet::builder();
-    for pat in patterns {
-        builder.add(globset::Glob::new(pat)?);
+fn target_files(
+    root_dir: &std::path::Path,
+    include: &globset::GlobSet,
+    exclude: &globset::GlobSet,
+    init_script: Option<&std::path::PathBuf>,
+) -> std::io::Result<Vec<std::path::PathBuf>> {
+    let mut r = Vec::new();
+    for entry in walkdir::WalkDir::new(root_dir)
+        .follow_links(true)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_entry(|entry| {
+            let path = entry.path().strip_prefix(root_dir).unwrap();
+            if exclude.is_match(path) || init_script.is_some_and(|init| init == path) {
+                false
+            } else if entry.file_type().is_dir() {
+                true
+            } else {
+                include.is_match(path)
+            }
+        })
+    {
+        let entry = entry?;
+        if entry.file_type().is_file() {
+            r.push(entry.into_path());
+        }
     }
-    Ok(builder.build()?)
+    Ok(r)
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+
+    use rstest::{fixture, rstest};
+
+    #[fixture]
+    #[once]
+    fn root_dir() -> tempfile::TempDir {
+        let temp_dir = tempfile::tempdir().unwrap();
+        for s in ["lua", "test", "foo"] {
+            std::fs::create_dir_all(temp_dir.path().join(s)).unwrap();
+        }
+        for s in [
+            "lua/hello.lua",
+            "lua/world.lua",
+            "foo/a.lua",
+            "test/abc.lua",
+            "test/bcd.lua",
+        ] {
+            std::fs::write(temp_dir.path().join(s), "").unwrap();
+        }
+        temp_dir
+    }
+
+    #[rstest]
+    fn lua_command_ok(root_dir: &tempfile::TempDir) {
+        let spec = ProfileSpec {
+            lua: Some(vec!["foo".into(), "hello world".into(), "!".into()]),
+            ..Default::default()
+        };
+        let p = Profile::from_spec("name".into(), spec, root_dir.path()).unwrap();
+        assert_eq!(String::from("foo"), p.lua_program);
+        assert_eq!(
+            vec![String::from("hello world"), String::from("!")],
+            p.lua_args
+        );
+    }
+
+    #[rstest]
+    fn lua_command_error(root_dir: &tempfile::TempDir) {
+        let spec = ProfileSpec {
+            lua: Some(Vec::new()),
+            ..Default::default()
+        };
+        assert!(Profile::from_spec("name".into(), spec, root_dir.path()).is_err());
+    }
+
+    #[rstest]
+    fn include_and_exclude(root_dir: &tempfile::TempDir) -> anyhow::Result<()> {
+        let root = root_dir.path();
+        assert_eq!(
+            vec![
+                root.join("lua").join("world.lua"),
+                root.join("test").join("abc.lua"),
+            ],
+            target_files(
+                root,
+                &build_globset(&["lua/**/*.lua", "test/a*.lua"])?,
+                &build_globset(&["lua/hello.lua"])?,
+                None,
+            )?,
+        );
+        Ok(())
+    }
+
+    #[rstest]
+    fn exclude_init_script(root_dir: &tempfile::TempDir) -> anyhow::Result<()> {
+        let root = root_dir.path();
+        assert_eq!(
+            vec![root.join("test").join("bcd.lua")],
+            target_files(
+                root,
+                &build_globset(&["test/**/*.lua"])?,
+                &build_globset(&[])?,
+                Some(&std::path::PathBuf::from("test/abc.lua")),
+            )?,
+        );
+        Ok(())
+    }
 }
