@@ -25,7 +25,7 @@ lazy_decompress!(LUA53, "lua53");
 lazy_decompress!(LUA52, "lua52");
 lazy_decompress!(LUA51, "lua51");
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub enum Lua {
     Lua51,
     Lua52,
@@ -81,5 +81,49 @@ impl Lua {
         });
         s.push_str(EXE_SUFFIX);
         s
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[rstest::rstest]
+    #[case(Some(Lua::default()), "lua")]
+    #[case(Some(Lua::Lua54), "lua5.4")]
+    #[case(None, "lua5.0")]
+    #[cfg_attr(unix, case(None, "lua5.1.exe"))]
+    #[cfg_attr(windows, case(Some(Lua::Lua51), "lua5.1.exe"))]
+    fn from_program_name(#[case] lua: Option<Lua>, #[case] program: &str) {
+        assert_eq!(lua, Lua::from_program_name(program));
+    }
+
+    #[test]
+    fn recommended_program_name() {
+        #[cfg(unix)]
+        assert_eq!(format!("lua5.1"), Lua::Lua51.recommended_program_name());
+        #[cfg(windows)]
+        assert_eq!(format!("lua5.1.exe"), Lua::Lua51.recommended_program_name());
+    }
+
+    #[rstest::rstest]
+    #[case(Lua::Lua51, "Lua 5.1")]
+    #[case(Lua::Lua52, "Lua 5.2")]
+    #[case(Lua::Lua53, "Lua 5.3")]
+    #[case(Lua::Lua54, "Lua 5.4")]
+    fn write(#[case] lua: Lua, #[case] version: &str) -> std::io::Result<()> {
+        let t = tempfile::tempdir()?;
+        let p = t.path().join(lua.recommended_program_name());
+        lua.write(&p)?;
+        std::fs::write(t.path().join("a.lua"), "print(_VERSION)\n")?;
+        let out = std::process::Command::new(p)
+            .arg(t.path().join("a.lua"))
+            .output()?;
+        assert!(out.status.success());
+        #[cfg(unix)]
+        assert_eq!(out.stdout, Vec::from(format!("{version}\n")));
+        #[cfg(windows)]
+        assert_eq!(out.stdout, Vec::from(format!("{version}\r\n")));
+        Ok(())
     }
 }
