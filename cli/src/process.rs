@@ -85,27 +85,18 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
 }
 
 #[derive(Serialize)]
+#[serde(tag = "t", content = "c")]
 pub enum Input {
     Initialize {
-        init_file: Option<std::path::PathBuf>,
         root_dir: std::path::PathBuf,
-        target_files: Vec<TargetFile>,
         term_width: u16,
     },
-}
-
-#[derive(Serialize)]
-pub struct TargetFile {
-    name: String,
-    path: std::path::PathBuf,
-}
-
-impl TargetFile {
-    pub fn new(path: std::path::PathBuf, root_dir: &std::path::Path) -> Self {
-        let relative_path = path.strip_prefix(root_dir).unwrap_or(&path);
-        let name = relative_path.display().to_string().replace('\\', "/");
-        Self { path, name }
-    }
+    TestFile {
+        path: std::path::PathBuf,
+        name: String,
+    },
+    Execute(std::path::PathBuf),
+    Finish,
 }
 
 #[derive(Deserialize)]

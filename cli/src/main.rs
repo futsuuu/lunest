@@ -81,29 +81,40 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
     println!("run with profile '{}'", profile.name().bold());
 
     let mut process = process::Process::spawn(cx, profile)?;
+
     process.write(&process::Input::Initialize {
-        init_file: profile.init_script().clone(),
         root_dir: cx.root_dir().to_path_buf(),
-        target_files: profile
-            .target_files()
-            .iter()
-            .map(|p| process::TargetFile::new(p.clone(), cx.root_dir()))
-            .collect(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;
+
+    if let Some(script) = profile.init_script() {
+        process.write(&process::Input::Execute(script.to_path_buf()))?;
+    }
+
+    for path in profile.target_files() {
+        process.write(&process::Input::TestFile {
+            path: path.to_path_buf(),
+            name: {
+                let rel = path.strip_prefix(cx.root_dir()).unwrap_or(path);
+                rel.display().to_string().replace('\\', "/")
+            },
+        })?;
+    }
+
+    process.write(&process::Input::Finish)?;
 
     let mut results = Vec::new();
     println!();
 
     loop {
-        let Some(request) = process.read()? else {
+        let Some(output) = process.read()? else {
             if process.is_running()? {
                 continue;
             } else {
                 break;
             }
         };
-        match request {
+        match output {
             process::Output::TestFinished(t) => {
                 println!("{t}");
                 results.push(t);

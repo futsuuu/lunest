@@ -14,13 +14,19 @@ local File = require("lunest.File")
 ---@param output lunest.File
 ---@return self
 function M.new(input, output)
-    return setmetatable({
-        input = input,
-        output = output,
-        input_callbacks = {
-            Initialize = {},
-        },
-    }, M)
+    local self = setmetatable({}, M)
+    self.input = input
+    self.output = output
+    self.input_callbacks = {
+        Initialize = {},
+        TestFile = {},
+        Execute = {},
+        Finish = {},
+    }
+    self:on_finish(function()
+        self:close()
+    end)
+    return self
 end
 
 ---@param input string
@@ -41,9 +47,10 @@ function M:loop()
         local line = self.input:readln()
         if line then
             if line:sub(#line) == "\n" then
-                local field, input = next(json.decode(buf .. line))
-                for _, callback in ipairs(self.input_callbacks[field] or {}) do
-                    callback(input)
+                ---@type lunest.Input
+                local input = json.decode(buf .. line)
+                for _, callback in ipairs(self.input_callbacks[input.t] or {}) do
+                    callback(input.c)
                 end
                 buf = ""
             else
@@ -61,6 +68,21 @@ end
 ---@param f fun(input: lunest.Input.Initialize)
 function M:on_initialize(f)
     table.insert(self.input_callbacks.Initialize, f)
+end
+
+---@param f fun(file: lunest.Input.TestFile)
+function M:on_test_file(f)
+    table.insert(self.input_callbacks.TestFile, f)
+end
+
+---@param f fun(script: string)
+function M:on_execute(f)
+    table.insert(self.input_callbacks.Execute, f)
+end
+
+---@param f fun()
+function M:on_finish(f)
+    table.insert(self.input_callbacks.Finish, f)
 end
 
 ---@param title string[]
@@ -84,14 +106,19 @@ function M:notify_test_finished(title, err)
 end
 
 --- enum
----@class lunest.Input
----@field Initialize? lunest.Input.Initialize
+---@alias lunest.Input
+---| { t: "Initialize", c: lunest.Input.Initialize }
+---| { t: "TestFile", c: lunest.Input.TestFile }
+---| { t: "Execute", c: string }
+---| { t: "Finish", c: nil }
 --- enum content
 ---@class lunest.Input.Initialize
----@field init_file string?
 ---@field root_dir string
----@field target_files { name: string, path: string }[]
 ---@field term_width integer
+--- enum content
+---@class lunest.Input.TestFile
+---@field name string
+---@field path string
 
 --- enum
 ---@class lunest.Output
