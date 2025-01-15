@@ -28,14 +28,13 @@ impl Process<std::fs::File, std::fs::File> {
         let input_path = temp_dir.join("in.jsonl");
         let output_path = temp_dir.join("out.jsonl");
         Ok(Self {
-            inner: {
-                profile
-                    .lua_command(cx)?
-                    .arg(cx.get_main_script())
-                    .env("LUNEST_IN", &input_path)
-                    .env("LUNEST_OUT", &output_path)
-                    .spawn()?
-            },
+            inner: profile
+                .lua_command(cx)?
+                .arg(cx.get_main_script())
+                .env("LUNEST_IN", &input_path)
+                .env("LUNEST_OUT", &output_path)
+                .current_dir(cx.root_dir())
+                .spawn()?,
             input: std::fs::File::options()
                 .create_new(true)
                 .append(true)

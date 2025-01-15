@@ -41,7 +41,6 @@ fn main() -> anyhow::Result<()> {
 
 #[test]
 fn test_lua() -> anyhow::Result<()> {
-    std::env::set_current_dir("..")?;
     run_cmd(vec![], vec!["all".into()])
 }
 
