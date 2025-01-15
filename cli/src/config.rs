@@ -1,30 +1,36 @@
 use anyhow::Context;
 use merge::Merge;
-use serde::Deserialize;
 
-#[derive(Debug, Default, Deserialize, PartialEq)]
+#[derive(Debug, Default, serde::Deserialize)]
 #[serde(default)]
 struct ConfigSpec {
     group: std::collections::HashMap<String, Vec<String>>,
     profile: std::collections::HashMap<String, ProfileSpec>,
 }
 
-#[derive(Clone, Debug, Deserialize, Merge, PartialEq)]
+#[derive(Clone, Debug, serde::Deserialize, Merge)]
 struct ProfileSpec {
     lua: Option<Vec<String>>,
-    include: Option<Vec<String>>,
-    exclude: Option<Vec<String>>,
+    include: Option<globset::GlobSet>,
+    exclude: Option<globset::GlobSet>,
     init: Option<std::path::PathBuf>,
 }
 
 impl Default for ProfileSpec {
     fn default() -> Self {
-        Self {
+        static DEFAULT: std::sync::OnceLock<ProfileSpec> = std::sync::OnceLock::new();
+        let default = DEFAULT.get_or_init(|| Self {
             lua: Some(vec!["lua".into()]),
-            include: Some(vec!["{src,lua}/**/*.lua".into()]),
-            exclude: Some(vec![]),
+            include: Some(
+                globset::GlobSet::builder()
+                    .add(globset::Glob::new("{src,lua}/**/*.lua").unwrap())
+                    .build()
+                    .unwrap(),
+            ),
+            exclude: Some(globset::GlobSet::empty()),
             init: None,
-        }
+        });
+        default.clone()
     }
 }
 
@@ -141,23 +147,26 @@ impl Profile {
         root_dir: &std::path::Path,
     ) -> anyhow::Result<Self> {
         let lua = spec.lua.as_ref().unwrap();
-        let target_files = target_files(&spec, root_dir)?;
+        let target_files = target_files(
+            &spec.include.unwrap_or_default(),
+            &spec.exclude.unwrap_or_default(),
+            root_dir,
+        )?;
         Ok(Self {
             name,
             init_script: spec.init,
             target_files,
-            lua_program: lua.first().unwrap().to_string(),
+            lua_program: lua.first().context("'lua' field is empty")?.to_string(),
             lua_args: lua.get(1..).unwrap_or_default().to_vec(),
         })
     }
 }
 
 fn target_files(
-    spec: &ProfileSpec,
+    include: &globset::GlobSet,
+    exclude: &globset::GlobSet,
     root_dir: &std::path::Path,
-) -> anyhow::Result<Vec<std::path::PathBuf>> {
-    let include = build_globset(spec.include.as_ref().unwrap())?;
-    let exclude = build_globset(spec.exclude.as_ref().unwrap())?;
+) -> std::io::Result<Vec<std::path::PathBuf>> {
     let mut r = Vec::new();
     for entry in walkdir::WalkDir::new(root_dir)
         .follow_links(true)
@@ -180,12 +189,4 @@ fn target_files(
         }
     }
     Ok(r)
-}
-
-fn build_globset(patterns: &[String]) -> anyhow::Result<globset::GlobSet> {
-    let mut builder = globset::GlobSet::builder();
-    for pat in patterns {
-        builder.add(globset::Glob::new(pat)?);
-    }
-    Ok(builder.build()?)
 }
