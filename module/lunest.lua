@@ -33,21 +33,16 @@ local function main()
         end
     end
 
-    process:on_initialize(function(input)
-        local init_file = input.init_file
-        if init_file then
-            dofile(init_file)
-        end
+    process:on_execute(function(script)
+        dofile(script)
+    end)
 
-        for _, file in ipairs(input.target_files) do
-            local group = Group.new(cx, file.name, file.path)
-            group:run(module.isolated(function()
-                assert(loadfile(file.path))(module.name(cx:root_dir(), file.path))
-            end))
-            group:finish()
-        end
-
-        process:close()
+    process:on_test_file(function(file)
+        local group = Group.new(cx, file.name, file.path)
+        group:run(module.isolated(function()
+            assert(loadfile(file.path))(module.name(cx:root_dir(), file.path))
+        end))
+        group:finish()
     end)
 
     process:loop()

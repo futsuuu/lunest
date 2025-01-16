@@ -1,14 +1,12 @@
-mod line_reader;
-
-use std::fmt;
+use std::{fmt, io::Write};
 
 use crossterm::{style::Stylize, terminal};
 use serde::{Deserialize, Serialize};
 
-pub struct Process<R: std::io::Read, W: std::io::Write> {
+pub struct Process {
     inner: std::process::Child,
-    input: W,
-    output: line_reader::LineReader<R>,
+    input: std::fs::File,
+    output: crate::io::LineBufReader<std::fs::File>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -19,7 +17,7 @@ pub enum Error {
     Exit(Option<i32>),
 }
 
-impl Process<std::fs::File, std::fs::File> {
+impl Process {
     pub fn spawn(
         cx: &crate::global::Context,
         profile: &crate::config::Profile,
@@ -39,28 +37,25 @@ impl Process<std::fs::File, std::fs::File> {
                 .create_new(true)
                 .append(true)
                 .open(input_path)?,
-            output: line_reader::LineReader::new({
+            output: crate::io::LineBufReader::new({
                 std::fs::write(&output_path, "")?;
                 std::fs::File::open(output_path)?
             }),
         })
     }
-}
 
-impl<R: std::io::Read, W: std::io::Write> Process<R, W> {
     pub fn read(&mut self) -> Result<Option<Output>, std::io::Error> {
-        match self.output.read_line() {
-            Ok(s) => Ok(Some(
-                serde_json::from_str(&s).expect("failed to deserialize a response"),
+        match self.output.read_line()? {
+            crate::io::Line::Ok(s) => Ok(Some(
+                serde_json::from_str(&s).expect("failed to deserialize an output"),
             )),
-            Err(line_reader::Error::Io(e)) => Err(e),
-            Err(line_reader::Error::NoNewLine) => Ok(None),
-            Err(line_reader::Error::Empty) => Ok(None),
+            crate::io::Line::NoLF => Ok(None),
+            crate::io::Line::Empty => Ok(None),
         }
     }
 
-    pub fn write(&mut self, req: &Input) -> Result<(), std::io::Error> {
-        let mut json = serde_json::to_vec(req).expect("failed to serialize a request");
+    pub fn write(&mut self, input: &Input) -> Result<(), std::io::Error> {
+        let mut json = serde_json::to_vec(input).expect("failed to serialize an input");
         json.extend(b"\n");
         self.input.write_all(&json)
     }
@@ -76,7 +71,7 @@ impl<R: std::io::Read, W: std::io::Write> Process<R, W> {
     }
 }
 
-impl<R: std::io::Read, W: std::io::Write> Drop for Process<R, W> {
+impl Drop for Process {
     fn drop(&mut self) {
         _ = self.inner.kill();
     }
@@ -90,27 +85,18 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
 }
 
 #[derive(Serialize)]
+#[serde(tag = "t", content = "c")]
 pub enum Input {
     Initialize {
-        init_file: Option<std::path::PathBuf>,
         root_dir: std::path::PathBuf,
-        target_files: Vec<TargetFile>,
         term_width: u16,
     },
-}
-
-#[derive(Serialize)]
-pub struct TargetFile {
-    name: String,
-    path: std::path::PathBuf,
-}
-
-impl TargetFile {
-    pub fn new(path: std::path::PathBuf, root_dir: &std::path::Path) -> Self {
-        let relative_path = path.strip_prefix(root_dir).unwrap_or(&path);
-        let name = relative_path.display().to_string().replace('\\', "/");
-        Self { path, name }
-    }
+    TestFile {
+        path: std::path::PathBuf,
+        name: String,
+    },
+    Execute(std::path::PathBuf),
+    Finish,
 }
 
 #[derive(Deserialize)]
