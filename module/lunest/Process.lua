@@ -86,6 +86,15 @@ function M:on_finish(f)
 end
 
 ---@param title string[]
+function M:notify_test_found(title)
+    return self:write({
+        TestFound = {
+            title = title,
+        },
+    })
+end
+
+---@param title string[]
 function M:notify_test_started(title)
     return self:write({
         TestStarted = {
@@ -113,6 +122,7 @@ end
 ---| { t: "Finish", c: nil }
 --- enum content
 ---@class lunest.Input.Initialize
+---@field mode "Run" | "List"
 ---@field root_dir string
 ---@field term_width integer
 --- enum content
@@ -122,8 +132,12 @@ end
 
 --- enum
 ---@class lunest.Output
+---@field TestFound? lunest.Output.TestFound
 ---@field TestStarted? lunest.Output.TestStarted
 ---@field TestFinished? lunest.Output.TestFinished
+--- enum content
+---@class lunest.Output.TestFound
+---@field title string[]
 --- enum content
 ---@class lunest.Output.TestStarted
 ---@field title string[]

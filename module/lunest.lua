@@ -21,8 +21,14 @@ local function main()
         ---@param func fun()
         function M.test(name, func)
             local test = Test.new(cx, name, (debug.getinfo(func, "S").source:gsub("^@", "")))
-            if test then
+            if not test then
+                return
+            end
+            local mode = cx:mode()
+            if mode == "Run" then
                 test:run(func)
+            elseif mode == "List" then
+                cx:process():notify_test_found(test:get_title())
             end
         end
 

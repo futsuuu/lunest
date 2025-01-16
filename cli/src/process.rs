@@ -88,6 +88,7 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
 #[serde(tag = "t", content = "c")]
 pub enum Input {
     Initialize {
+        mode: Mode,
         root_dir: std::path::PathBuf,
         term_width: u16,
     },
@@ -99,14 +100,33 @@ pub enum Input {
     Finish,
 }
 
+#[derive(Serialize)]
+pub enum Mode {
+    Run,
+    List,
+}
+
 #[derive(Deserialize)]
+#[allow(clippy::enum_variant_names)]
 pub enum Output {
+    TestFound(TestFound),
     TestStarted(TestStarted),
     TestFinished(TestFinished),
 }
 
 fn fmt_title(title: &[String]) -> String {
     title.join(&" :: ".grey().to_string())
+}
+
+#[derive(Deserialize)]
+pub struct TestFound {
+    title: Vec<String>,
+}
+
+impl fmt::Display for TestFound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", fmt_title(&self.title))
+    }
 }
 
 #[derive(Deserialize)]
