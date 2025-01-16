@@ -27,21 +27,22 @@ M.__index = M
 ---@param cx lunest.Context
 ---@param name string
 ---@param source string
----@return self
+---@return self?
 function M.new(cx, name, source)
+    local parent = assert(Group.current())
+    if parent.source ~= source then
+        return
+    end
     local self = setmetatable({}, M)
     self.cx = cx
     self.name = name
     self.source = source
-    self.parent = assert(Group.current())
+    self.parent = parent
     return self
 end
 
 ---@param func fun()
 function M:run(func)
-    if self.parent.source ~= self.source then
-        return
-    end
     func = self:wrap(func)
     if self.parent:is_toplevel() then
         self.parent:defer(func)
@@ -133,6 +134,7 @@ local function handle_error(err, level)
 end
 
 ---@param func fun()
+---@return fun()
 function M:wrap(func)
     local title = self:get_title()
     return function()

@@ -21,15 +21,18 @@ local function main()
         ---@param func fun()
         function M.test(name, func)
             local test = Test.new(cx, name, (debug.getinfo(func, "S").source:gsub("^@", "")))
-            test:run(func)
+            if test then
+                test:run(func)
+            end
         end
 
         ---@param name string
         ---@param func fun()
         function M.group(name, func)
             local group = Group.new(cx, name, (debug.getinfo(func, "S").source:gsub("^@", "")))
-            group:run(func)
-            group:finish()
+            if group then
+                group:run(func)
+            end
         end
     end
 
@@ -38,11 +41,10 @@ local function main()
     end)
 
     process:on_test_file(function(file)
-        local group = Group.new(cx, file.name, file.path)
+        local group = Group.new_toplevel(cx, file.name, file.path)
         group:run(module.isolated(function()
             assert(loadfile(file.path))(module.name(cx:root_dir(), file.path))
         end))
-        group:finish()
     end)
 
     process:loop()
