@@ -75,6 +75,7 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
     let mut process = process::Process::spawn(cx, profile)?;
 
     process.write(&process::Input::Initialize {
+        mode: process::Mode::Run,
         root_dir: cx.root_dir().to_path_buf(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;
@@ -115,6 +116,7 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
                 print!("{t}{}", crossterm::cursor::MoveToColumn(0));
                 _ = std::io::stdout().flush();
             }
+            _ => (),
         }
     }
 
@@ -135,8 +137,61 @@ struct ListCommand {
 
 impl ListCommand {
     fn exec(&self) -> anyhow::Result<()> {
+        let cx = global::Context::new()?;
+
+        for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {
+            if i != 0 {
+                println!();
+            }
+            list(&cx, profile)?;
+        }
         Ok(())
     }
+}
+
+fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
+    println!("run with profile '{}'", profile.name().bold());
+
+    let mut process = process::Process::spawn(cx, profile)?;
+
+    process.write(&process::Input::Initialize {
+        mode: process::Mode::List,
+        root_dir: cx.root_dir().to_path_buf(),
+        term_width: crossterm::terminal::size().map_or(60, |size| size.0),
+    })?;
+
+    if let Some(script) = profile.init_script() {
+        process.write(&process::Input::Execute(script.to_path_buf()))?;
+    }
+
+    for path in profile.target_files() {
+        process.write(&process::Input::TestFile {
+            path: path.to_path_buf(),
+            name: {
+                let rel = path.strip_prefix(cx.root_dir()).unwrap_or(path);
+                rel.display().to_string().replace('\\', "/")
+            },
+        })?;
+    }
+
+    process.write(&process::Input::Finish)?;
+
+    println!();
+
+    loop {
+        let Some(output) = process.read()? else {
+            if process.is_running()? {
+                continue;
+            } else {
+                break;
+            }
+        };
+        if let process::Output::TestFound(t) = output {
+            println!("{t}");
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(clap::Args, Debug)]

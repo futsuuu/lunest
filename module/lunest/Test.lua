@@ -139,6 +139,7 @@ function M:run(func)
     end)
 end
 
+---@return string[]
 function M:get_title()
     local title = { self.name }
     local group = self.parent
