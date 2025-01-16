@@ -21,32 +21,25 @@ M.__index = M
 ---@param name string
 ---@param source string
 ---@return self
+function M.new_toplevel(cx, name, source)
+    return assert(M.new(cx, name, source))
+end
+
+---@param cx lunest.Context
+---@param name string
+---@param source string
+---@return self?
 function M.new(cx, name, source)
+    if current and current.source ~= source then
+        return
+    end
     local self = setmetatable({}, M)
     self.cx = cx
     self.name = name
     self.source = source
     self.parent = current
     self.deferred = {}
-    if self.parent and self.parent:is_toplevel() then
-        self.parent:defer(function()
-            current = self
-        end)
-    else
-        current = self
-    end
     return self
-end
-
-function M:finish()
-    local function inner()
-        current = self.parent
-    end
-    if self.parent and self.parent:is_toplevel() then
-        self.parent:defer(inner)
-    else
-        inner()
-    end
 end
 
 ---@return boolean
@@ -56,18 +49,26 @@ end
 
 ---@param func fun()
 function M:run(func)
-    if self.parent and self.parent.source ~= self.source then
-        return
-    end
+    func = self:wrap(func)
     if self.parent and self.parent:is_toplevel() then
         self.parent:defer(func)
     else
         func()
     end
-    for _, f in ipairs(self.deferred) do
-        f()
+end
+
+---@param func fun()
+---@return fun()
+function M:wrap(func)
+    return function()
+        current = self
+        func()
+        for _, f in ipairs(self.deferred) do
+            f()
+        end
+        self.deferred = {}
+        current = self.parent
     end
-    self.deferred = {}
 end
 
 ---@param func fun()
