@@ -41,16 +41,6 @@ function M.new(cx, name, source)
     return self
 end
 
----@param func fun()
-function M:run(func)
-    func = self:wrap(func)
-    if self.parent:is_toplevel() then
-        self.parent:defer(func)
-    else
-        func()
-    end
-end
-
 ---@param func function
 local function test_runner(func)
     ---@param ___ function
@@ -134,10 +124,9 @@ local function handle_error(err, level)
 end
 
 ---@param func fun()
----@return fun()
-function M:wrap(func)
-    local title = self:get_title()
-    return function()
+function M:run(func)
+    self.parent:defer(function()
+        local title = self:get_title()
         self.cx:process():notify_test_started(title)
         assert(not current)
         current = self
@@ -147,7 +136,7 @@ function M:wrap(func)
             err = nil
         end
         self.cx:process():notify_test_finished(title, err)
-    end
+    end)
 end
 
 function M:get_title()

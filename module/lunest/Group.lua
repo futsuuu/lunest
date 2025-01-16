@@ -42,25 +42,9 @@ function M.new(cx, name, source)
     return self
 end
 
----@return boolean
-function M:is_toplevel()
-    return self.parent == nil
-end
-
 ---@param func fun()
 function M:run(func)
-    func = self:wrap(func)
-    if self.parent and self.parent:is_toplevel() then
-        self.parent:defer(func)
-    else
-        func()
-    end
-end
-
----@param func fun()
----@return fun()
-function M:wrap(func)
-    return function()
+    local function wrapped()
         current = self
         func()
         for _, f in ipairs(self.deferred) do
@@ -68,6 +52,11 @@ function M:wrap(func)
         end
         self.deferred = {}
         current = self.parent
+    end
+    if self.parent then
+        self.parent:defer(wrapped)
+    else
+        wrapped()
     end
 end
 
