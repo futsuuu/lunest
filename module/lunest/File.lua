@@ -45,12 +45,14 @@ end)
 ---@param ... string | number
 function M:write(...)
     assert(self[1]:write(...))
+    self[1]:flush()
 end
 
 ---@param ... string | number
 function M:writeln(...)
-    self:write(...)
-    self:write("\n")
+    assert(self[1]:write(...))
+    assert(self[1]:write("\n"))
+    self[1]:flush()
 end
 
 ---@private

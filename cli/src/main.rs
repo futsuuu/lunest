@@ -75,7 +75,6 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
     let mut process = process::Process::spawn(cx, profile)?;
 
     process.write(&process::Input::Initialize {
-        mode: process::Mode::Run,
         root_dir: cx.root_dir().to_path_buf(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;
@@ -84,6 +83,7 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
         process.write(&process::Input::Execute(script.to_path_buf()))?;
     }
 
+    process.write(&process::Input::SetMode(process::Mode::Run))?;
     for path in profile.target_files() {
         process.write(&process::Input::TestFile {
             path: path.to_path_buf(),
@@ -155,14 +155,25 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
     let mut process = process::Process::spawn(cx, profile)?;
 
     process.write(&process::Input::Initialize {
-        mode: process::Mode::List,
         root_dir: cx.root_dir().to_path_buf(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;
-
     if let Some(script) = profile.init_script() {
         process.write(&process::Input::Execute(script.to_path_buf()))?;
     }
+
+    println!();
+    print_test_list(cx, profile, &mut process)?;
+
+    Ok(())
+}
+
+fn print_test_list(
+    cx: &global::Context,
+    profile: &config::Profile,
+    process: &mut process::Process,
+) -> anyhow::Result<()> {
+    process.write(&process::Input::SetMode(process::Mode::List))?;
 
     for path in profile.target_files() {
         process.write(&process::Input::TestFile {
@@ -174,20 +185,19 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
         })?;
     }
 
-    process.write(&process::Input::Finish)?;
-
-    println!();
-
     loop {
         let Some(output) = process.read()? else {
-            if process.is_running()? {
-                continue;
-            } else {
+            anyhow::ensure!(process.is_running()?);
+            continue;
+        };
+        match output {
+            process::Output::TestFound(t) => {
+                println!("{t}");
+            }
+            process::Output::AllInputsRead => {
                 break;
             }
-        };
-        if let process::Output::TestFound(t) = output {
-            println!("{t}");
+            _ => (),
         }
     }
 
