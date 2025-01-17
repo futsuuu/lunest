@@ -88,7 +88,6 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
 #[serde(tag = "t", content = "c")]
 pub enum Input {
     Initialize {
-        mode: Mode,
         root_dir: std::path::PathBuf,
         term_width: u16,
     },
@@ -97,6 +96,7 @@ pub enum Input {
         name: String,
     },
     Execute(std::path::PathBuf),
+    SetMode(Mode),
     Finish,
 }
 
@@ -107,11 +107,12 @@ pub enum Mode {
 }
 
 #[derive(Deserialize)]
-#[allow(clippy::enum_variant_names)]
+#[serde(tag = "t", content = "c")]
 pub enum Output {
     TestFound(TestFound),
     TestStarted(TestStarted),
     TestFinished(TestFinished),
+    AllInputsRead,
 }
 
 fn fmt_title(title: &[String]) -> String {

@@ -21,6 +21,7 @@ function M.new(input, output)
         Initialize = {},
         TestFile = {},
         Execute = {},
+        SetMode = {},
         Finish = {},
     }
     self:on_finish(function()
@@ -43,9 +44,11 @@ end
 
 function M:loop()
     local buf = ""
+    local all_inputs_read = true
     while not self.input:is_closed() do
         local line = self.input:readln()
         if line then
+            all_inputs_read = false
             if line:sub(#line) == "\n" then
                 ---@type lunest.Input
                 local input = json.decode(buf .. line)
@@ -56,6 +59,9 @@ function M:loop()
             else
                 buf = buf .. line
             end
+        elseif not all_inputs_read and buf == "" then
+            all_inputs_read = true
+            self:write({ t = "AllInputsRead" })
         end
     end
 end
@@ -80,6 +86,11 @@ function M:on_execute(f)
     table.insert(self.input_callbacks.Execute, f)
 end
 
+---@param f fun(mode: lunest.Input.Mode)
+function M:on_set_mode(f)
+    table.insert(self.input_callbacks.SetMode, f)
+end
+
 ---@param f fun()
 function M:on_finish(f)
     table.insert(self.input_callbacks.Finish, f)
@@ -88,18 +99,16 @@ end
 ---@param title string[]
 function M:notify_test_found(title)
     return self:write({
-        TestFound = {
-            title = title,
-        },
+        t = "TestFound",
+        c = { title = title },
     })
 end
 
 ---@param title string[]
 function M:notify_test_started(title)
     return self:write({
-        TestStarted = {
-            title = title,
-        },
+        t = "TestStarted",
+        c = { title = title },
     })
 end
 
@@ -107,7 +116,8 @@ end
 ---@param err lunest.TestError?
 function M:notify_test_finished(title, err)
     return self:write({
-        TestFinished = {
+        t = "TestFinished",
+        c = {
             title = title,
             error = err,
         },
@@ -119,22 +129,27 @@ end
 ---| { t: "Initialize", c: lunest.Input.Initialize }
 ---| { t: "TestFile", c: lunest.Input.TestFile }
 ---| { t: "Execute", c: string }
+---| { t: "SetMode", c: lunest.Input.Mode }
 ---| { t: "Finish", c: nil }
 --- enum content
 ---@class lunest.Input.Initialize
----@field mode "Run" | "List"
 ---@field root_dir string
 ---@field term_width integer
 --- enum content
 ---@class lunest.Input.TestFile
 ---@field name string
 ---@field path string
+--- enum content
+---@alias lunest.Input.Mode
+---| "Run"
+---| "List"
 
 --- enum
----@class lunest.Output
----@field TestFound? lunest.Output.TestFound
----@field TestStarted? lunest.Output.TestStarted
----@field TestFinished? lunest.Output.TestFinished
+---@alias lunest.Output
+---| { t: "TestFound", c: lunest.Output.TestFound }
+---| { t: "TestStarted", c: lunest.Output.TestStarted }
+---| { t: "TestFinished", c: lunest.Output.TestFinished }
+---| { t: "AllInputsRead", c: nil }
 --- enum content
 ---@class lunest.Output.TestFound
 ---@field title string[]

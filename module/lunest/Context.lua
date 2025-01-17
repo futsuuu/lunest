@@ -1,6 +1,6 @@
 ---@class lunest.Context
 ---@field package _process lunest.Process
----@field package _mode "Run" | "List"
+---@field package _mode lunest.Input.Mode
 ---@field package _root_dir string
 ---@field package _term_width integer
 local M = {}
@@ -14,9 +14,12 @@ function M.new(process)
     self._process = process
 
     process:on_initialize(function(input)
-        self._mode = input.mode
         self._root_dir = input.root_dir
         self._term_width = input.term_width
+    end)
+
+    process:on_set_mode(function(mode)
+        self._mode = mode
     end)
 
     return self
@@ -27,7 +30,7 @@ function M:process()
     return self._process
 end
 
----@return "Run" | "List"
+---@return lunest.Input.Mode
 function M:mode()
     return self._mode
 end
