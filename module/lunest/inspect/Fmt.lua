@@ -1,5 +1,5 @@
 ---@class lunest.inspect.Fmt
----@field package max_expand_lv uinteger
+---@field package max_expand_lv integer
 ---@field package has_newline_sequence boolean
 ---@field package list lunest.inspect.Fmt.Entry[]
 ---@field package mutable boolean
@@ -37,6 +37,7 @@ function M.new(...)
     self.mutable = true
     return self:extend(...)
 end
+
 local F = M.new
 
 ---@param ... lunest.inspect.Fmt.Entry
