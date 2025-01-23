@@ -1,6 +1,7 @@
 ---@class lunest.Test
 ---@field package cx lunest.Context
 ---@field package name string
+---@field package func fun()
 ---@field package source string
 ---@field package parent lunest.Group
 local M = {}
@@ -27,8 +28,9 @@ M.__index = M
 ---@param cx lunest.Context
 ---@param name string
 ---@param source string
+---@param func fun()
 ---@return self?
-function M.new(cx, name, source)
+function M.new(cx, name, source, func)
     local parent = assert(Group.current())
     if parent.source ~= source then
         return
@@ -36,6 +38,7 @@ function M.new(cx, name, source)
     local self = setmetatable({}, M)
     self.cx = cx
     self.name = name
+    self.func = func
     self.source = source
     self.parent = parent
     return self
@@ -123,20 +126,22 @@ local function handle_error(err, level)
     }
 end
 
----@param func fun()
-function M:run(func)
-    self.parent:defer(function()
-        local title = self:get_title()
+function M:run()
+    local title = self:get_title()
+    local mode = self.cx:mode()
+    if mode == "List" then
+        self.cx:process():notify_test_found(title)
+    elseif mode == "Run" then
         self.cx:process():notify_test_started(title)
         assert(not current)
         current = self
-        local success, err = xpcall(test_runner(func), handle_error)
+        local success, err = xpcall(test_runner(self.func), handle_error)
         current = nil
         if success then
             err = nil
         end
         self.cx:process():notify_test_finished(title, err)
-    end)
+    end
 end
 
 ---@return string[]

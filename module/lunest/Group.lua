@@ -1,10 +1,13 @@
 ---@class lunest.Group
 ---@field cx lunest.Context
 ---@field name string
+---@field func fun()
 ---@field source string
 ---@field parent lunest.Group?
----@field deferred fun()[]
+---@field children (lunest.Test | lunest.Group)[]
 local M = {}
+
+local module = require("lunest.module")
 
 ---@type lunest.Group?
 local current = nil
@@ -19,50 +22,49 @@ M.__index = M
 
 ---@param cx lunest.Context
 ---@param name string
----@param source string
----@return self
-function M.new_toplevel(cx, name, source)
-    return assert(M.new(cx, name, source))
+---@param path string
+function M.run_file(cx, name, path)
+    M.new(
+        cx,
+        name,
+        path,
+        module.isolated(function()
+            assert(loadfile(path))(module.name(cx:root_dir(), path))
+        end)
+    ):run()
 end
 
 ---@param cx lunest.Context
 ---@param name string
 ---@param source string
+---@param func fun()
 ---@return self?
-function M.new(cx, name, source)
+function M.new(cx, name, source, func)
     if current and current.source ~= source then
         return
     end
     local self = setmetatable({}, M)
     self.cx = cx
     self.name = name
+    self.func = func
     self.source = source
     self.parent = current
-    self.deferred = {}
+    self.children = {}
     return self
 end
 
----@param func fun()
-function M:run(func)
-    local function wrapped()
-        current = self
-        func()
-        for _, f in ipairs(self.deferred) do
-            f()
-        end
-        self.deferred = {}
-        current = self.parent
+function M:run()
+    current = self
+    self.func()
+    for _, child in ipairs(self.children) do
+        child:run()
     end
-    if self.parent then
-        self.parent:defer(wrapped)
-    else
-        wrapped()
-    end
+    current = self.parent
 end
 
----@param func fun()
-function M:defer(func)
-    table.insert(self.deferred, func)
+---@param child (lunest.Group | lunest.Test)[]
+function M:push_child(child)
+    table.insert(self.children, child)
 end
 
 return M

@@ -5,7 +5,6 @@ local Group = require("lunest.Group")
 local Process = require("lunest.Process")
 local Test = require("lunest.Test")
 local assertion = require("lunest.assertion")
-local module = require("lunest.module")
 
 local function main()
     local process = Process.open(assert(os.getenv("LUNEST_IN")), assert(os.getenv("LUNEST_OUT")))
@@ -20,24 +19,18 @@ local function main()
         ---@param name string
         ---@param func fun()
         function M.test(name, func)
-            local test = Test.new(cx, name, (debug.getinfo(func, "S").source:gsub("^@", "")))
-            if not test then
-                return
-            end
-            local mode = cx:mode()
-            if mode == "Run" then
-                test:run(func)
-            elseif mode == "List" then
-                cx:process():notify_test_found(test:get_title())
+            local test = Test.new(cx, name, debug.getinfo(2, "S").source:gsub("^@", ""), func)
+            if test then
+                assert(Group.current()):push_child(test)
             end
         end
 
         ---@param name string
         ---@param func fun()
         function M.group(name, func)
-            local group = Group.new(cx, name, (debug.getinfo(func, "S").source:gsub("^@", "")))
+            local group = Group.new(cx, name, debug.getinfo(2, "S").source:gsub("^@", ""), func)
             if group then
-                group:run(func)
+                assert(Group.current()):push_child(group)
             end
         end
     end
@@ -47,10 +40,7 @@ local function main()
     end)
 
     process:on_test_file(function(file)
-        local group = Group.new_toplevel(cx, file.name, file.path)
-        group:run(module.isolated(function()
-            assert(loadfile(file.path))(module.name(cx:root_dir(), file.path))
-        end))
+        Group.run_file(cx, file.name, file.path)
     end)
 
     process:loop()
