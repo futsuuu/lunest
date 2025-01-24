@@ -96,11 +96,15 @@ function M:on_finish(f)
     table.insert(self.input_callbacks.Finish, f)
 end
 
+---@param id string
 ---@param title string[]
-function M:notify_test_found(title)
+function M:send_test_info(id, title)
     return self:write({
-        t = "TestFound",
-        c = { title = title },
+        t = "TestInfo",
+        c = {
+            id = id,
+            title = title,
+        },
     })
 end
 
@@ -146,12 +150,13 @@ end
 
 --- enum
 ---@alias lunest.Output
----| { t: "TestFound", c: lunest.Output.TestFound }
+---| { t: "TestInfo", c: lunest.Output.TestInfo }
 ---| { t: "TestStarted", c: lunest.Output.TestStarted }
 ---| { t: "TestFinished", c: lunest.Output.TestFinished }
 ---| { t: "AllInputsRead", c: nil }
 --- enum content
----@class lunest.Output.TestFound
+---@class lunest.Output.TestInfo
+---@field id string
 ---@field title string[]
 --- enum content
 ---@class lunest.Output.TestStarted

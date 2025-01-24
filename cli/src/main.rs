@@ -163,16 +163,19 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
     }
 
     println!();
-    print_test_list(cx, profile, &mut process)?;
+    let test_list = get_test_list(cx, profile, &mut process)?;
+    for info in &test_list {
+        println!("{info}");
+    }
 
     Ok(())
 }
 
-fn print_test_list(
+fn get_test_list(
     cx: &global::Context,
     profile: &config::Profile,
     process: &mut process::Process,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<process::TestInfo>> {
     process.write(&process::Input::SetMode(process::Mode::List))?;
 
     for path in profile.target_files() {
@@ -185,14 +188,15 @@ fn print_test_list(
         })?;
     }
 
+    let mut list = Vec::new();
     loop {
         let Some(output) = process.read()? else {
             anyhow::ensure!(process.is_running()?);
             continue;
         };
         match output {
-            process::Output::TestFound(t) => {
-                println!("{t}");
+            process::Output::TestInfo(info) => {
+                list.push(info);
             }
             process::Output::AllInputsRead => {
                 break;
@@ -201,7 +205,7 @@ fn print_test_list(
         }
     }
 
-    Ok(())
+    Ok(list)
 }
 
 #[derive(clap::Args, Debug)]

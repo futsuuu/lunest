@@ -1,5 +1,6 @@
 ---@class lunest.Test
 ---@field package cx lunest.Context
+---@field package id string
 ---@field package name string
 ---@field package func fun()
 ---@field package source string
@@ -41,6 +42,7 @@ function M.new(cx, name, source, func)
     self.func = func
     self.source = source
     self.parent = parent
+    self.id = self.parent:register(self)
     return self
 end
 
@@ -130,7 +132,7 @@ function M:run()
     local title = self:get_title()
     local mode = self.cx:mode()
     if mode == "List" then
-        self.cx:process():notify_test_found(title)
+        self.cx:process():send_test_info(self.id, title)
     elseif mode == "Run" then
         self.cx:process():notify_test_started(title)
         assert(not current)

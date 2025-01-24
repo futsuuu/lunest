@@ -19,19 +19,13 @@ local function main()
         ---@param name string
         ---@param func fun()
         function M.test(name, func)
-            local test = Test.new(cx, name, debug.getinfo(2, "S").source:gsub("^@", ""), func)
-            if test then
-                assert(Group.current()):push_child(test)
-            end
+            Test.new(cx, name, debug.getinfo(2, "S").source:gsub("^@", ""), func)
         end
 
         ---@param name string
         ---@param func fun()
         function M.group(name, func)
-            local group = Group.new(cx, name, debug.getinfo(2, "S").source:gsub("^@", ""), func)
-            if group then
-                assert(Group.current()):push_child(group)
-            end
+            Group.new(cx, name, debug.getinfo(2, "S").source:gsub("^@", ""), func)
         end
     end
 

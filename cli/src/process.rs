@@ -109,7 +109,7 @@ pub enum Mode {
 #[derive(Deserialize)]
 #[serde(tag = "t", content = "c")]
 pub enum Output {
-    TestFound(TestFound),
+    TestInfo(TestInfo),
     TestStarted(TestStarted),
     TestFinished(TestFinished),
     AllInputsRead,
@@ -120,11 +120,12 @@ fn fmt_title(title: &[String]) -> String {
 }
 
 #[derive(Deserialize)]
-pub struct TestFound {
+pub struct TestInfo {
+    id: String,
     title: Vec<String>,
 }
 
-impl fmt::Display for TestFound {
+impl fmt::Display for TestInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", fmt_title(&self.title))
     }

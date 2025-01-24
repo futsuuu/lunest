@@ -1,5 +1,6 @@
 ---@class lunest.Group
 ---@field cx lunest.Context
+---@field id string
 ---@field name string
 ---@field func fun()
 ---@field source string
@@ -7,6 +8,7 @@
 ---@field children (lunest.Test | lunest.Group)[]
 local M = {}
 
+local id = require("lunest.id")
 local module = require("lunest.module")
 
 ---@type lunest.Group?
@@ -50,6 +52,11 @@ function M.new(cx, name, source, func)
     self.source = source
     self.parent = current
     self.children = {}
+    if current then
+        self.id = current:register(self)
+    else
+        self.id = id.toplevel(name)
+    end
     return self
 end
 
@@ -63,8 +70,11 @@ function M:run()
 end
 
 ---@param child (lunest.Group | lunest.Test)[]
-function M:push_child(child)
-    table.insert(self.children, child)
+---@return string
+function M:register(child)
+    local i = #self.children + 1
+    self.children[i] = child
+    return id.join(self.id, i)
 end
 
 return M
