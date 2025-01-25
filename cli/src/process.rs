@@ -88,25 +88,61 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
 #[serde(tag = "t", content = "c")]
 pub enum Input {
     Initialize {
+        target_files: Vec<TargetFile>,
         root_dir: std::path::PathBuf,
         term_width: u16,
     },
-    TestFile {
-        path: std::path::PathBuf,
-        name: String,
+    Run {
+        test_id_filter: Option<Vec<String>>,
+        test_mode: TestMode,
     },
     Execute(std::path::PathBuf),
     Finish,
 }
 
+#[derive(Serialize)]
+pub struct TargetFile {
+    path: std::path::PathBuf,
+    name: String,
+}
+
+#[derive(Serialize)]
+pub enum TestMode {
+    Run,
+    SendInfo,
+}
+
+impl TargetFile {
+    pub fn from_path(path: std::path::PathBuf, root_dir: &std::path::Path) -> Self {
+        let rel = path.strip_prefix(root_dir).unwrap_or(&path);
+        let name = rel.display().to_string().replace('\\', "/");
+        Self { path, name }
+    }
+}
+
 #[derive(Deserialize)]
+#[serde(tag = "t", content = "c")]
 pub enum Output {
+    TestInfo(TestInfo),
     TestStarted(TestStarted),
     TestFinished(TestFinished),
+    AllInputsRead,
 }
 
 fn fmt_title(title: &[String]) -> String {
     title.join(&" :: ".grey().to_string())
+}
+
+#[derive(Deserialize)]
+pub struct TestInfo {
+    pub id: String,
+    pub title: Vec<String>,
+}
+
+impl fmt::Display for TestInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", fmt_title(&self.title))
+    }
 }
 
 #[derive(Deserialize)]

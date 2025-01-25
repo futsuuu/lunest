@@ -19,7 +19,7 @@ function M.new(input, output)
     self.output = output
     self.input_callbacks = {
         Initialize = {},
-        TestFile = {},
+        Run = {},
         Execute = {},
         Finish = {},
     }
@@ -43,9 +43,11 @@ end
 
 function M:loop()
     local buf = ""
+    local all_inputs_read = true
     while not self.input:is_closed() do
         local line = self.input:readln()
         if line then
+            all_inputs_read = false
             if line:sub(#line) == "\n" then
                 ---@type lunest.Input
                 local input = json.decode(buf .. line)
@@ -56,6 +58,9 @@ function M:loop()
             else
                 buf = buf .. line
             end
+        elseif not all_inputs_read and buf == "" then
+            all_inputs_read = true
+            self:write({ t = "AllInputsRead" })
         end
     end
 end
@@ -70,9 +75,9 @@ function M:on_initialize(f)
     table.insert(self.input_callbacks.Initialize, f)
 end
 
----@param f fun(file: lunest.Input.TestFile)
-function M:on_test_file(f)
-    table.insert(self.input_callbacks.TestFile, f)
+---@param f fun(input: lunest.Input.Run)
+function M:on_run(f)
+    table.insert(self.input_callbacks.Run, f)
 end
 
 ---@param f fun(script: string)
@@ -85,12 +90,23 @@ function M:on_finish(f)
     table.insert(self.input_callbacks.Finish, f)
 end
 
+---@param id string
+---@param title string[]
+function M:send_test_info(id, title)
+    return self:write({
+        t = "TestInfo",
+        c = {
+            id = id,
+            title = title,
+        },
+    })
+end
+
 ---@param title string[]
 function M:notify_test_started(title)
     return self:write({
-        TestStarted = {
-            title = title,
-        },
+        t = "TestStarted",
+        c = { title = title },
     })
 end
 
@@ -98,7 +114,8 @@ end
 ---@param err lunest.TestError?
 function M:notify_test_finished(title, err)
     return self:write({
-        TestFinished = {
+        t = "TestFinished",
+        c = {
             title = title,
             error = err,
         },
@@ -108,22 +125,33 @@ end
 --- enum
 ---@alias lunest.Input
 ---| { t: "Initialize", c: lunest.Input.Initialize }
----| { t: "TestFile", c: lunest.Input.TestFile }
+---| { t: "Run", c: lunest.Input.Run }
 ---| { t: "Execute", c: string }
 ---| { t: "Finish", c: nil }
 --- enum content
 ---@class lunest.Input.Initialize
 ---@field root_dir string
+---@field target_files { name: string, path: string }[]
 ---@field term_width integer
 --- enum content
----@class lunest.Input.TestFile
----@field name string
----@field path string
+---@class lunest.Input.Run
+---@field test_id_filter string[]?
+---@field test_mode lunest.TestMode
+--- enum
+---@alias lunest.TestMode
+---| "Run"
+---| "SendInfo"
 
 --- enum
----@class lunest.Output
----@field TestStarted? lunest.Output.TestStarted
----@field TestFinished? lunest.Output.TestFinished
+---@alias lunest.Output
+---| { t: "TestInfo", c: lunest.Output.TestInfo }
+---| { t: "TestStarted", c: lunest.Output.TestStarted }
+---| { t: "TestFinished", c: lunest.Output.TestFinished }
+---| { t: "AllInputsRead", c: nil }
+--- enum content
+---@class lunest.Output.TestInfo
+---@field id string
+---@field title string[]
 --- enum content
 ---@class lunest.Output.TestStarted
 ---@field title string[]

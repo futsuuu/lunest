@@ -1,6 +1,8 @@
 ---@class lunest.Test
 ---@field package cx lunest.Context
+---@field package id string
 ---@field package name string
+---@field package func fun()
 ---@field package source string
 ---@field package parent lunest.Group
 local M = {}
@@ -27,27 +29,25 @@ M.__index = M
 ---@param cx lunest.Context
 ---@param name string
 ---@param source string
----@return self
-function M.new(cx, name, source)
-    local self = setmetatable({}, M)
-    self.cx = cx
-    self.name = name
-    self.source = source
-    self.parent = assert(Group.current())
-    return self
-end
-
 ---@param func fun()
-function M:run(func)
-    if self.parent.source ~= self.source then
+---@return self?
+function M.new(cx, name, source, func)
+    local parent = assert(Group.current())
+    if parent.source ~= source then
         return
     end
-    func = self:wrap(func)
-    if self.parent:is_toplevel() then
-        self.parent:defer(func)
-    else
-        func()
+    local self = setmetatable({}, M)
+    local id = parent:register(self)
+    if not cx:is_id_enabled(id) then
+        return
     end
+    self.cx = cx
+    self.id = id
+    self.name = name
+    self.func = func
+    self.source = source
+    self.parent = parent
+    return self
 end
 
 ---@param func function
@@ -132,14 +132,16 @@ local function handle_error(err, level)
     }
 end
 
----@param func fun()
-function M:wrap(func)
+function M:run()
     local title = self:get_title()
-    return function()
+    local mode = self.cx:test_mode()
+    if mode == "SendInfo" then
+        self.cx:process():send_test_info(self.id, title)
+    elseif mode == "Run" then
         self.cx:process():notify_test_started(title)
         assert(not current)
         current = self
-        local success, err = xpcall(test_runner(func), handle_error)
+        local success, err = xpcall(test_runner(self.func), handle_error)
         current = nil
         if success then
             err = nil
@@ -148,6 +150,7 @@ function M:wrap(func)
     end
 end
 
+---@return string[]
 function M:get_title()
     local title = { self.name }
     local group = self.parent
