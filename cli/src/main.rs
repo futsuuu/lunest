@@ -20,9 +20,8 @@ fn main() -> anyhow::Result<()> {
 fn test_lua() -> anyhow::Result<()> {
     RunCommand {
         profiles: Profiles {
-            // FIXME: test Lua 5.1
-            profile: vec!["lua52".into(), "lua53".into(), "lua54".into()],
-            group: vec![],
+            profile: vec![],
+            group: vec!["all".into()],
         },
     }
     .exec()
