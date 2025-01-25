@@ -88,22 +88,30 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
 #[serde(tag = "t", content = "c")]
 pub enum Input {
     Initialize {
+        target_files: Vec<TargetFile>,
         root_dir: std::path::PathBuf,
         term_width: u16,
     },
-    TestFile {
-        path: std::path::PathBuf,
-        name: String,
+    SendTestInfo,
+    RunTests {
+        ids: Vec<String>,
     },
     Execute(std::path::PathBuf),
-    SetMode(Mode),
     Finish,
 }
 
 #[derive(Serialize)]
-pub enum Mode {
-    Run,
-    List,
+pub struct TargetFile {
+    path: std::path::PathBuf,
+    name: String,
+}
+
+impl TargetFile {
+    pub fn from_path(path: std::path::PathBuf, root_dir: &std::path::Path) -> Self {
+        let rel = path.strip_prefix(root_dir).unwrap_or(&path);
+        let name = rel.display().to_string().replace('\\', "/");
+        Self { path, name }
+    }
 }
 
 #[derive(Deserialize)]
@@ -121,8 +129,8 @@ fn fmt_title(title: &[String]) -> String {
 
 #[derive(Deserialize)]
 pub struct TestInfo {
-    id: String,
-    title: Vec<String>,
+    pub id: String,
+    pub title: Vec<String>,
 }
 
 impl fmt::Display for TestInfo {

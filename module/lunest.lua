@@ -33,8 +33,16 @@ local function main()
         dofile(script)
     end)
 
-    process:on_test_file(function(file)
-        Group.run_file(cx, file.name, file.path)
+    process:on_send_test_info(function()
+        for _, file in ipairs(cx:target_files()) do
+            Group.run_file(cx, file.name, file.path)
+        end
+    end)
+
+    process:on_run_tests(function()
+        for _, file in ipairs(cx:target_files()) do
+            Group.run_file(cx, file.name, file.path)
+        end
     end)
 
     process:loop()

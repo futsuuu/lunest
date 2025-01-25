@@ -37,12 +37,16 @@ function M.new(cx, name, source, func)
         return
     end
     local self = setmetatable({}, M)
+    local id = parent:register(self)
+    if not cx:is_id_enabled(id) then
+        return
+    end
     self.cx = cx
+    self.id = id
     self.name = name
     self.func = func
     self.source = source
     self.parent = parent
-    self.id = self.parent:register(self)
     return self
 end
 
@@ -131,9 +135,9 @@ end
 function M:run()
     local title = self:get_title()
     local mode = self.cx:mode()
-    if mode == "List" then
+    if mode == "list" then
         self.cx:process():send_test_info(self.id, title)
-    elseif mode == "Run" then
+    elseif mode == "run" then
         self.cx:process():notify_test_started(title)
         assert(not current)
         current = self

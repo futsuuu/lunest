@@ -26,14 +26,13 @@ M.__index = M
 ---@param name string
 ---@param path string
 function M.run_file(cx, name, path)
-    M.new(
-        cx,
-        name,
-        path,
-        module.isolated(function()
-            assert(loadfile(path))(module.name(cx:root_dir(), path))
-        end)
-    ):run()
+    local func = module.isolated(function()
+        assert(loadfile(path))(module.name(cx:root_dir(), path))
+    end)
+    local self = M.new(cx, name, path, func)
+    if self then
+        self:run()
+    end
 end
 
 ---@param cx lunest.Context
@@ -46,17 +45,17 @@ function M.new(cx, name, source, func)
         return
     end
     local self = setmetatable({}, M)
+    local _id = current and current:register(self) or id.toplevel(name)
+    if not cx:is_id_enabled(_id) then
+        return
+    end
     self.cx = cx
+    self.id = _id
     self.name = name
     self.func = func
     self.source = source
     self.parent = current
     self.children = {}
-    if current then
-        self.id = current:register(self)
-    else
-        self.id = id.toplevel(name)
-    end
     return self
 end
 

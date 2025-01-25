@@ -19,9 +19,9 @@ function M.new(input, output)
     self.output = output
     self.input_callbacks = {
         Initialize = {},
-        TestFile = {},
+        SendTestInfo = {},
+        RunTests = {},
         Execute = {},
-        SetMode = {},
         Finish = {},
     }
     self:on_finish(function()
@@ -76,19 +76,19 @@ function M:on_initialize(f)
     table.insert(self.input_callbacks.Initialize, f)
 end
 
----@param f fun(file: lunest.Input.TestFile)
-function M:on_test_file(f)
-    table.insert(self.input_callbacks.TestFile, f)
+---@param f fun()
+function M:on_send_test_info(f)
+    table.insert(self.input_callbacks.SendTestInfo, f)
+end
+
+---@param f fun(input: lunest.Input.RunTests)
+function M:on_run_tests(f)
+    table.insert(self.input_callbacks.RunTests, f)
 end
 
 ---@param f fun(script: string)
 function M:on_execute(f)
     table.insert(self.input_callbacks.Execute, f)
-end
-
----@param f fun(mode: lunest.Input.Mode)
-function M:on_set_mode(f)
-    table.insert(self.input_callbacks.SetMode, f)
 end
 
 ---@param f fun()
@@ -131,22 +131,18 @@ end
 --- enum
 ---@alias lunest.Input
 ---| { t: "Initialize", c: lunest.Input.Initialize }
----| { t: "TestFile", c: lunest.Input.TestFile }
+---| { t: "SendTestInfo", c: nil }
+---| { t: "RunTests", c: lunest.Input.RunTests }
 ---| { t: "Execute", c: string }
----| { t: "SetMode", c: lunest.Input.Mode }
 ---| { t: "Finish", c: nil }
 --- enum content
 ---@class lunest.Input.Initialize
 ---@field root_dir string
+---@field target_files { name: string, path: string }[]
 ---@field term_width integer
 --- enum content
----@class lunest.Input.TestFile
----@field name string
----@field path string
---- enum content
----@alias lunest.Input.Mode
----| "Run"
----| "List"
+---@class lunest.Input.RunTests
+---@field ids string[]
 
 --- enum
 ---@alias lunest.Output

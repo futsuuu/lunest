@@ -76,6 +76,11 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
 
     process.write(&process::Input::Initialize {
         root_dir: cx.root_dir().to_path_buf(),
+        target_files: profile
+            .target_files()
+            .iter()
+            .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+            .collect(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;
 
@@ -83,17 +88,12 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
         process.write(&process::Input::Execute(script.to_path_buf()))?;
     }
 
-    process.write(&process::Input::SetMode(process::Mode::Run))?;
-    for path in profile.target_files() {
-        process.write(&process::Input::TestFile {
-            path: path.to_path_buf(),
-            name: {
-                let rel = path.strip_prefix(cx.root_dir()).unwrap_or(path);
-                rel.display().to_string().replace('\\', "/")
-            },
-        })?;
-    }
-
+    let ids = get_test_list(&mut process)?
+        .into_iter()
+        .map(|info| info.id)
+        .collect::<Vec<_>>();
+    println!("found {} tests", ids.len());
+    process.write(&process::Input::RunTests { ids })?;
     process.write(&process::Input::Finish)?;
 
     let mut results = Vec::new();
@@ -156,6 +156,11 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
 
     process.write(&process::Input::Initialize {
         root_dir: cx.root_dir().to_path_buf(),
+        target_files: profile
+            .target_files()
+            .iter()
+            .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+            .collect(),
         term_width: crossterm::terminal::size().map_or(60, |size| size.0),
     })?;
     if let Some(script) = profile.init_script() {
@@ -163,7 +168,7 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
     }
 
     println!();
-    let test_list = get_test_list(cx, profile, &mut process)?;
+    let test_list = get_test_list(&mut process)?;
     for info in &test_list {
         println!("{info}");
     }
@@ -171,22 +176,8 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_test_list(
-    cx: &global::Context,
-    profile: &config::Profile,
-    process: &mut process::Process,
-) -> anyhow::Result<Vec<process::TestInfo>> {
-    process.write(&process::Input::SetMode(process::Mode::List))?;
-
-    for path in profile.target_files() {
-        process.write(&process::Input::TestFile {
-            path: path.to_path_buf(),
-            name: {
-                let rel = path.strip_prefix(cx.root_dir()).unwrap_or(path);
-                rel.display().to_string().replace('\\', "/")
-            },
-        })?;
-    }
+fn get_test_list(process: &mut process::Process) -> anyhow::Result<Vec<process::TestInfo>> {
+    process.write(&process::Input::SendTestInfo)?;
 
     let mut list = Vec::new();
     loop {
