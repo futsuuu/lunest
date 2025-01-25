@@ -92,9 +92,9 @@ pub enum Input {
         root_dir: std::path::PathBuf,
         term_width: u16,
     },
-    SendTestInfo,
-    RunTests {
-        ids: Vec<String>,
+    Run {
+        test_id_filter: Option<Vec<String>>,
+        test_mode: TestMode,
     },
     Execute(std::path::PathBuf),
     Finish,
@@ -104,6 +104,12 @@ pub enum Input {
 pub struct TargetFile {
     path: std::path::PathBuf,
     name: String,
+}
+
+#[derive(Serialize)]
+pub enum TestMode {
+    Run,
+    SendInfo,
 }
 
 impl TargetFile {

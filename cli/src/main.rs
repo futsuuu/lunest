@@ -93,7 +93,10 @@ fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> 
         .map(|info| info.id)
         .collect::<Vec<_>>();
     println!("found {} tests", ids.len());
-    process.write(&process::Input::RunTests { ids })?;
+    process.write(&process::Input::Run {
+        test_id_filter: Some(ids),
+        test_mode: process::TestMode::Run,
+    })?;
     process.write(&process::Input::Finish)?;
 
     let mut results = Vec::new();
@@ -177,7 +180,10 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
 }
 
 fn get_test_list(process: &mut process::Process) -> anyhow::Result<Vec<process::TestInfo>> {
-    process.write(&process::Input::SendTestInfo)?;
+    process.write(&process::Input::Run {
+        test_id_filter: None,
+        test_mode: process::TestMode::SendInfo,
+    })?;
 
     let mut list = Vec::new();
     loop {

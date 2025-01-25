@@ -1,10 +1,11 @@
 ---@class lunest.Context
----@field package id_set table<string, true>
+---@field package id_set table<string, true>?
 ---@field package _process lunest.Process
----@field package _mode "run" | "list"
+---@field package _test_mode lunest.TestMode
 ---@field package _root_dir string
 ---@field package _target_files { name: string, path: string }[]
 ---@field package _term_width integer
+---@field package _send_info_only boolean
 local M = {}
 
 local id = require("lunest.id")
@@ -24,13 +25,10 @@ function M.new(process)
         self._term_width = input.term_width
     end)
 
-    process:on_run_tests(function(input)
-        self._mode = "run"
-        self.id_set = id.create_set(input.ids)
-    end)
-
-    process:on_send_test_info(function()
-        self._mode = "list"
+    process:on_run(function(input)
+        self._test_mode = input.test_mode
+        local id_list = input.test_id_filter
+        self.id_set = id_list and id.create_set(id_list)
     end)
 
     return self
@@ -51,9 +49,9 @@ function M:is_id_enabled(_id)
     return set[_id] == true
 end
 
----@return "run" | "list"
-function M:mode()
-    return self._mode
+---@return lunest.TestMode
+function M:test_mode()
+    return self._test_mode
 end
 
 ---@return string

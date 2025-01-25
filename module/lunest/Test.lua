@@ -134,10 +134,10 @@ end
 
 function M:run()
     local title = self:get_title()
-    local mode = self.cx:mode()
-    if mode == "list" then
+    local mode = self.cx:test_mode()
+    if mode == "SendInfo" then
         self.cx:process():send_test_info(self.id, title)
-    elseif mode == "run" then
+    elseif mode == "Run" then
         self.cx:process():notify_test_started(title)
         assert(not current)
         current = self
