@@ -11,6 +11,7 @@ pub struct Context {
 
 impl Context {
     pub fn new() -> anyhow::Result<Self> {
+        log::trace!("creating new global context");
         let config = crate::config::Config::read()?;
         let temp_dir = tempfile::TempDir::with_prefix(env!("CARGO_PKG_NAME"))?;
         let main_script = temp_dir.path().join("main.lua");

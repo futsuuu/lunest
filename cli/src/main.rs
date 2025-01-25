@@ -9,6 +9,8 @@ use clap::Parser;
 use crossterm::style::Stylize;
 
 fn main() -> anyhow::Result<()> {
+    init_logger();
+    log::info!("start");
     match Args::parse() {
         Args::Run(c) => c.exec(),
         Args::List(c) => c.exec(),
@@ -16,15 +18,8 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-#[test]
-fn test_lua() -> anyhow::Result<()> {
-    RunCommand {
-        profiles: Profiles {
-            profile: vec![],
-            group: vec!["all".into()],
-        },
-    }
-    .exec()
+fn init_logger() {
+    env_logger::builder().format_timestamp_millis().init();
 }
 
 /// Lua testing framework
@@ -51,6 +46,8 @@ struct RunCommand {
 
 impl RunCommand {
     fn exec(&self) -> anyhow::Result<()> {
+        log::trace!("executing 'run' command");
+
         let cx = global::Context::new()?;
 
         let mut has_error = false;
@@ -140,6 +137,8 @@ struct ListCommand {
 
 impl ListCommand {
     fn exec(&self) -> anyhow::Result<()> {
+        log::trace!("executing 'list' command");
+
         let cx = global::Context::new()?;
 
         for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {

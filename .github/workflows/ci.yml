@@ -9,6 +9,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: full
+  RUST_LOG: trace
   RUSTFLAGS: -Dwarnings
 
 jobs:
@@ -36,6 +37,9 @@ jobs:
 
       - name: cargo test
         run: cargo test --workspace --all-targets
+
+      - name: lunest run
+        run: cargo run -- run --group all
 
   lint:
     runs-on: ubuntu-latest
