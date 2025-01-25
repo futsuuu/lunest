@@ -42,6 +42,6 @@ local function main()
     process:loop()
 end
 
-if arg[0] == debug.getinfo(1, "S").source:gsub("^@", "") then
+if _G.arg[0] and ("@" .. _G.arg[0]) == debug.getinfo(1, "S").source then
     main()
 end
