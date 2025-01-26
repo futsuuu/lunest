@@ -9,11 +9,21 @@ pub struct Context {
     process_dir_counter: std::cell::Cell<usize>,
 }
 
+#[derive(clap::Args, Debug)]
+pub struct ContextOptions {
+    /// Don't clean up a temporary directory on exit
+    #[arg(long)]
+    keep_tmpdir: bool,
+}
+
 impl Context {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(opts: &ContextOptions) -> anyhow::Result<Self> {
         log::trace!("creating new global context");
         let config = crate::config::Config::read()?;
-        let temp_dir = tempfile::TempDir::with_prefix(env!("CARGO_PKG_NAME"))?;
+        let temp_dir = tempfile::Builder::new()
+            .prefix(env!("CARGO_PKG_NAME"))
+            .keep(opts.keep_tmpdir)
+            .tempdir()?;
         let main_script = temp_dir.path().join("main.lua");
         std::fs::write(
             &main_script,
