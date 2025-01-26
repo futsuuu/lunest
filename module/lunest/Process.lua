@@ -47,10 +47,12 @@ function M:loop()
     while not self.input:is_closed() do
         local line = self.input:readln()
         if line then
+            self:log("line: %s", line)
             all_inputs_read = false
             if line:sub(#line) == "\n" then
                 ---@type lunest.Input
                 local input = json.decode(buf .. line)
+                self:log("calling callbacks of %q", input.t)
                 for _, callback in ipairs(self.input_callbacks[input.t] or {}) do
                     callback(input.c)
                 end
@@ -88,6 +90,17 @@ end
 ---@param f fun()
 function M:on_finish(f)
     table.insert(self.input_callbacks.Finish, f)
+end
+
+---@param s string
+---@param ... any
+function M:log(s, ...)
+    if not self.output:is_closed() then
+        return self:write({
+            t = "Log",
+            c = s:format(...),
+        })
+    end
 end
 
 ---@param id string
@@ -148,6 +161,7 @@ end
 ---| { t: "TestStarted", c: lunest.Output.TestStarted }
 ---| { t: "TestFinished", c: lunest.Output.TestFinished }
 ---| { t: "AllInputsRead", c: nil }
+---| { t: "Log", c: string }
 --- enum content
 ---@class lunest.Output.TestInfo
 ---@field id string

@@ -8,6 +8,7 @@ local assertion = require("lunest.assertion")
 
 local function main()
     local process = Process.open(assert(os.getenv("LUNEST_IN")), assert(os.getenv("LUNEST_OUT")))
+    process:log("start")
     local cx = Context.new(process)
 
     do
@@ -31,6 +32,7 @@ local function main()
 
     process:on_execute(function(script)
         dofile(script)
+        process:log("executed %q", script)
     end)
 
     process:on_run(function()

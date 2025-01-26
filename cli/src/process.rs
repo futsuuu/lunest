@@ -65,7 +65,10 @@ impl Process {
         let output = match self.output.read_line()? {
             crate::io::Line::Ok(s) => {
                 let out = serde_json::from_str(&s).expect("failed to deserialize an output");
-                log::debug!("output read: {out:?}");
+                match &out {
+                    Output::Log(s) => log::info!("[log] {s}"),
+                    _ => log::debug!("output read: {out:?}"),
+                }
                 Some(out)
             }
             crate::io::Line::NoLF | crate::io::Line::Empty => None,
@@ -159,6 +162,7 @@ pub enum Output {
     TestStarted(TestStarted),
     TestFinished(TestFinished),
     AllInputsRead,
+    Log(String),
 }
 
 fn fmt_title(title: &[String]) -> String {
