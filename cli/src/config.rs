@@ -45,6 +45,7 @@ pub struct Config {
 
 impl Config {
     pub fn read() -> anyhow::Result<Self> {
+        log::trace!("reading configuration");
         let (root_dir, config_file) = find_config_file(std::env::current_dir()?);
         if let Some(path) = config_file {
             Self::from_spec(toml::from_str(&std::fs::read_to_string(path)?)?, root_dir)
@@ -125,15 +126,20 @@ impl Config {
 }
 
 fn find_config_file(cwd: std::path::PathBuf) -> (std::path::PathBuf, Option<std::path::PathBuf>) {
+    log::trace!("finding configuration file");
     let mut dir = cwd.as_path();
     loop {
         if let Some(config) = [dir.join("lunest.toml"), dir.join(".lunest.toml")]
             .into_iter()
             .find(|p| p.exists())
         {
+            log::info!("configuration file found");
+            log::debug!("root directory: {dir:?}");
+            log::debug!("configuration file: {config:?}");
             break (dir.to_path_buf(), Some(config));
         }
         let Some(parent) = dir.parent() else {
+            log::info!("configuration file not found");
             break (cwd, None);
         };
         dir = parent;
@@ -237,6 +243,7 @@ fn target_files(
     exclude: &globset::GlobSet,
     init_script: Option<&std::path::PathBuf>,
 ) -> std::io::Result<Vec<std::path::PathBuf>> {
+    log::trace!("reading target files");
     let mut r = Vec::new();
     for entry in walkdir::WalkDir::new(root_dir)
         .follow_links(true)
@@ -258,6 +265,7 @@ fn target_files(
             r.push(entry.into_path());
         }
     }
+    log::debug!("{} files found", r.len());
     Ok(r)
 }
 

@@ -4,7 +4,7 @@ use crossterm::{style::Stylize, terminal};
 use serde::{Deserialize, Serialize};
 
 pub struct Process {
-    inner: std::process::Child,
+    inner: Option<std::process::Child>,
     input: std::fs::File,
     output: crate::io::LineBufReader<std::fs::File>,
 }
@@ -22,17 +22,34 @@ impl Process {
         cx: &crate::global::Context,
         profile: &crate::config::Profile,
     ) -> Result<Self, std::io::Error> {
+        log::trace!("spawning new process");
+
         let temp_dir = cx.create_process_dir()?;
         let input_path = temp_dir.join("in.jsonl");
         let output_path = temp_dir.join("out.jsonl");
+
+        let mut cmd = profile.lua_command(cx)?;
+        cmd.arg(cx.get_main_script());
+        log::debug!(
+            "lua command: {} {}",
+            cmd.get_program().to_string_lossy(),
+            cmd.get_args()
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+
+        let child = cmd
+            .env("LUNEST_IN", &input_path)
+            .env("LUNEST_OUT", &output_path)
+            .current_dir(cx.root_dir())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+        log::info!("process spawned as {}", child.id());
+
         Ok(Self {
-            inner: profile
-                .lua_command(cx)?
-                .arg(cx.get_main_script())
-                .env("LUNEST_IN", &input_path)
-                .env("LUNEST_OUT", &output_path)
-                .current_dir(cx.root_dir())
-                .spawn()?,
+            inner: Some(child),
             input: std::fs::File::options()
                 .create_new(true)
                 .append(true)
@@ -45,35 +62,53 @@ impl Process {
     }
 
     pub fn read(&mut self) -> Result<Option<Output>, std::io::Error> {
-        match self.output.read_line()? {
-            crate::io::Line::Ok(s) => Ok(Some(
-                serde_json::from_str(&s).expect("failed to deserialize an output"),
-            )),
-            crate::io::Line::NoLF => Ok(None),
-            crate::io::Line::Empty => Ok(None),
-        }
+        let output = match self.output.read_line()? {
+            crate::io::Line::Ok(s) => {
+                let out = serde_json::from_str(&s).expect("failed to deserialize an output");
+                match &out {
+                    Output::Log(s) => log::info!("[log] {s}"),
+                    _ => log::debug!("output read: {out:?}"),
+                }
+                Some(out)
+            }
+            crate::io::Line::NoLF | crate::io::Line::Empty => None,
+        };
+        Ok(output)
     }
 
     pub fn write(&mut self, input: &Input) -> Result<(), std::io::Error> {
+        log::debug!("writing input: {input:?}");
         let mut json = serde_json::to_vec(input).expect("failed to serialize an input");
         json.extend(b"\n");
         self.input.write_all(&json)
     }
 
     pub fn is_running(&mut self) -> Result<bool, Error> {
-        match self.inner.try_wait()? {
-            Some(status) => match status.code() {
-                Some(0) => Ok(false),
-                code => Err(Error::Exit(code)),
-            },
-            None => Ok(true),
+        let Some(inner) = &mut self.inner else {
+            return Ok(true);
+        };
+        if inner.try_wait()?.is_none() {
+            return Ok(true);
+        }
+        let inner = self.inner.take().unwrap();
+        log::info!("process {} already exited", inner.id());
+
+        let out = inner.wait_with_output()?;
+        log::debug!("stdout: {}", String::from_utf8_lossy(&out.stdout));
+        log::debug!("stderr: {}", String::from_utf8_lossy(&out.stderr));
+
+        match out.status.code() {
+            Some(0) => Ok(false),
+            code => Err(Error::Exit(code)),
         }
     }
 }
 
 impl Drop for Process {
     fn drop(&mut self) {
-        _ = self.inner.kill();
+        if let Some(inner) = &mut self.inner {
+            _ = inner.kill();
+        }
     }
 }
 
@@ -84,7 +119,7 @@ fn get_exit_error_message(code: &Option<i32>) -> String {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(tag = "t", content = "c")]
 pub enum Input {
     Initialize {
@@ -100,13 +135,13 @@ pub enum Input {
     Finish,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TargetFile {
     path: std::path::PathBuf,
     name: String,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub enum TestMode {
     Run,
     SendInfo,
@@ -120,20 +155,21 @@ impl TargetFile {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(tag = "t", content = "c")]
 pub enum Output {
     TestInfo(TestInfo),
     TestStarted(TestStarted),
     TestFinished(TestFinished),
     AllInputsRead,
+    Log(String),
 }
 
 fn fmt_title(title: &[String]) -> String {
     title.join(&" :: ".grey().to_string())
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct TestInfo {
     pub id: String,
     pub title: Vec<String>,
@@ -145,7 +181,7 @@ impl fmt::Display for TestInfo {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct TestStarted {
     title: Vec<String>,
 }
@@ -162,7 +198,7 @@ impl fmt::Display for TestStarted {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct TestFinished {
     title: Vec<String>,
     error: Option<TestError>,
@@ -186,14 +222,14 @@ impl fmt::Display for TestFinished {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct TestError {
     message: String,
     traceback: String,
     info: Option<TestErrorInfo>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub enum TestErrorInfo {
     Diff { left: String, right: String },
 }

@@ -11,6 +11,7 @@ M.__index = M
 ---@param file file*
 ---@return self
 function M.from_raw(file)
+    file:setvbuf("no")
     return setmetatable({ file }, M)
 end
 
@@ -23,7 +24,7 @@ end
 
 ---@return self
 function M.tmp()
-    return M.from_raw(io.tmpfile())
+    return M.from_raw(assert(io.tmpfile()))
 end
 
 function M:close()
@@ -45,42 +46,30 @@ end)
 ---@param ... string | number
 function M:write(...)
     assert(self[1]:write(...))
-    self[1]:flush()
 end
 
 ---@param ... string | number
 function M:writeln(...)
     assert(self[1]:write(...))
     assert(self[1]:write("\n"))
-    self[1]:flush()
-end
-
----@private
----@param whence seekwhence?
----@param offset integer?
----@return integer
-function M:_seek(whence, offset)
-    local offset_, err = self[1]:seek(whence, offset)
-    assert(offset_ and not err, err)
-    return offset_
 end
 
 ---@param offset integer?
 ---@return integer
 function M:seek(offset)
-    return self:_seek("set", offset)
+    return assert(self[1]:seek("set", offset))
 end
 
 ---@param offset integer?
 ---@return integer
 function M:seek_end(offset)
-    return self:_seek("end", -offset)
+    return assert(self[1]:seek("end", -offset))
 end
 
 ---@param offset integer?
 ---@return integer
 function M:seek_rel(offset)
-    return self:_seek("cur", offset)
+    return assert(self[1]:seek("cur", offset))
 end
 
 if _G["jit"] or _VERSION ~= "Lua 5.1" then

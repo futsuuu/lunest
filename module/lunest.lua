@@ -8,6 +8,7 @@ local assertion = require("lunest.assertion")
 
 local function main()
     local process = Process.open(assert(os.getenv("LUNEST_IN")), assert(os.getenv("LUNEST_OUT")))
+    process:log("start")
     local cx = Context.new(process)
 
     do
@@ -31,6 +32,7 @@ local function main()
 
     process:on_execute(function(script)
         dofile(script)
+        process:log("executed %q", script)
     end)
 
     process:on_run(function()
@@ -42,6 +44,6 @@ local function main()
     process:loop()
 end
 
-if arg[0] == debug.getinfo(1, "S").source:gsub("^@", "") then
+if _G.arg[0] and ("@" .. _G.arg[0]) == debug.getinfo(1, "S").source then
     main()
 end
