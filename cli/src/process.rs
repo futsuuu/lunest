@@ -54,10 +54,10 @@ impl Process {
                 .create_new(true)
                 .append(true)
                 .open(input_path)?,
-            output: crate::buffer::LineBufReader::new({
-                std::fs::write(&output_path, "")?;
-                std::fs::File::open(output_path)?
-            }),
+            output: {
+                std::fs::File::create(&output_path)?;
+                std::fs::File::open(output_path)?.into()
+            },
         })
     }
 

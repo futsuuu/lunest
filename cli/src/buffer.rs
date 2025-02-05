@@ -45,6 +45,12 @@ impl<R: std::io::Read> std::ops::DerefMut for LineBufReader<R> {
     }
 }
 
+impl<R: std::io::Read> std::convert::From<R> for LineBufReader<R> {
+    fn from(value: R) -> Self {
+        Self::new(value)
+    }
+}
+
 #[cfg(test)]
 mod line_buf_reader_tests {
     use super::*;
