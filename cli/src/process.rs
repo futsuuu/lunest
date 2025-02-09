@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Process {
     inner: Option<std::process::Child>,
     input: std::fs::File,
-    output: crate::io::LineBufReader<std::fs::File>,
+    output: crate::buffer::LineReader<std::fs::File>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -54,16 +54,16 @@ impl Process {
                 .create_new(true)
                 .append(true)
                 .open(input_path)?,
-            output: crate::io::LineBufReader::new({
-                std::fs::write(&output_path, "")?;
-                std::fs::File::open(output_path)?
-            }),
+            output: {
+                std::fs::File::create(&output_path)?;
+                std::fs::File::open(output_path)?.into()
+            },
         })
     }
 
     pub fn read(&mut self) -> Result<Option<Output>, std::io::Error> {
         let output = match self.output.read_line()? {
-            crate::io::Line::Ok(s) => {
+            crate::buffer::Line::Ok(s) => {
                 let out = serde_json::from_str(&s).expect("failed to deserialize an output");
                 match &out {
                     Output::Log(s) => log::info!("[log] {s}"),
@@ -71,7 +71,7 @@ impl Process {
                 }
                 Some(out)
             }
-            crate::io::Line::NoLF | crate::io::Line::Empty => None,
+            crate::buffer::Line::NoLF | crate::buffer::Line::Empty => None,
         };
         Ok(output)
     }

@@ -1,6 +1,6 @@
+mod buffer;
 mod config;
 mod global;
-mod io;
 mod process;
 
 use std::io::Write;
