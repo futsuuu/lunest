@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Process {
     inner: Option<std::process::Child>,
     input: std::fs::File,
-    output: crate::buffer::LineBufReader<std::fs::File>,
+    output: crate::buffer::LineReader<std::fs::File>,
 }
 
 #[derive(thiserror::Error, Debug)]

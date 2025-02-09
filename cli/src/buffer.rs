@@ -1,6 +1,6 @@
 use std::io::BufRead;
 
-pub struct LineBufReader<R: std::io::Read> {
+pub struct LineReader<R: std::io::Read> {
     reader: std::io::BufReader<R>,
     buffer: String,
 }
@@ -12,7 +12,7 @@ pub enum Line {
     NoLF,
 }
 
-impl<R: std::io::Read> LineBufReader<R> {
+impl<R: std::io::Read> LineReader<R> {
     pub fn new(reader: R) -> Self {
         Self {
             reader: std::io::BufReader::new(reader),
@@ -33,19 +33,19 @@ impl<R: std::io::Read> LineBufReader<R> {
     }
 }
 
-impl<R: std::io::Read> std::ops::Deref for LineBufReader<R> {
+impl<R: std::io::Read> std::ops::Deref for LineReader<R> {
     type Target = std::io::BufReader<R>;
     fn deref(&self) -> &Self::Target {
         &self.reader
     }
 }
-impl<R: std::io::Read> std::ops::DerefMut for LineBufReader<R> {
+impl<R: std::io::Read> std::ops::DerefMut for LineReader<R> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.reader
     }
 }
 
-impl<R: std::io::Read> std::convert::From<R> for LineBufReader<R> {
+impl<R: std::io::Read> std::convert::From<R> for LineReader<R> {
     fn from(value: R) -> Self {
         Self::new(value)
     }
@@ -57,7 +57,7 @@ mod line_buf_reader_tests {
 
     #[test]
     fn empty() {
-        let mut r = LineBufReader::new(std::io::Cursor::new("\n"));
+        let mut r = LineReader::new(std::io::Cursor::new("\n"));
         assert_eq!(Line::Ok(String::from("\n")), r.read_line().unwrap());
         assert_eq!(Line::Empty, r.read_line().unwrap());
         assert_eq!(Line::Empty, r.read_line().unwrap());
@@ -65,7 +65,7 @@ mod line_buf_reader_tests {
 
     #[test]
     fn no_lf() {
-        let mut r = LineBufReader::new(std::io::Cursor::new(b"abc".to_vec()));
+        let mut r = LineReader::new(std::io::Cursor::new(b"abc".to_vec()));
         assert_eq!(Line::NoLF, r.read_line().unwrap());
         r.get_mut().get_mut().extend(b"def\n");
         assert_eq!(Line::Ok(String::from("abcdef\n")), r.read_line().unwrap());
@@ -73,7 +73,7 @@ mod line_buf_reader_tests {
 
     #[test]
     fn preserve_buf_capacity() {
-        let mut r = LineBufReader::new(std::io::Cursor::new(b"hello\n".to_vec()));
+        let mut r = LineReader::new(std::io::Cursor::new(b"hello\n".to_vec()));
         _ = r.read_line();
         assert_eq!(0, r.buffer.len());
         assert!(6 <= r.buffer.capacity());
