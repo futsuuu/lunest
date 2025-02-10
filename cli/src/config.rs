@@ -204,7 +204,7 @@ impl Profile {
         &self,
         cx: &crate::global::Context,
     ) -> std::io::Result<std::process::Command> {
-        let mut c = std::process::Command::new(&*cx.get_lua_program(&self.lua_program)?);
+        let mut c = std::process::Command::new(cx.get_lua_program(&self.lua_program)?);
         c.args(&self.lua_args);
         Ok(c)
     }
