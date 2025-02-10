@@ -3,9 +3,8 @@ pub struct Context {
 
     temp_dir: tempfile::TempDir,
     main_script: std::path::PathBuf,
-    lua_programs: std::cell::RefCell<
-        std::collections::HashMap<std::rc::Rc<std::ffi::OsString>, std::rc::Rc<std::ffi::OsString>>,
-    >,
+    program_cache:
+        std::cell::RefCell<std::collections::HashMap<std::ffi::OsString, std::ffi::OsString>>,
     process_dir_counter: std::cell::Cell<usize>,
 }
 
@@ -33,7 +32,7 @@ impl Context {
             config,
             temp_dir,
             main_script,
-            lua_programs: std::cell::RefCell::new(std::collections::HashMap::new()),
+            program_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
             process_dir_counter: std::cell::Cell::new(0),
         })
     }
@@ -61,24 +60,24 @@ impl Context {
 
     pub fn get_lua_program(
         &self,
-        name: impl Into<std::ffi::OsString>,
-    ) -> std::io::Result<impl std::ops::Deref<Target = std::ffi::OsString>> {
-        let name = std::rc::Rc::new(name.into());
-        if let Some(program) = self.lua_programs.borrow().get(&name) {
-            return Ok(std::rc::Rc::clone(program));
+        name: impl AsRef<std::ffi::OsStr>,
+    ) -> std::io::Result<std::ffi::OsString> {
+        let name = name.as_ref();
+        if let Some(program) = self.program_cache.borrow().get(name) {
+            return Ok(program.clone());
         }
-        let program = if let Ok(path) = which::which(&*name) {
-            std::rc::Rc::new(path.into())
-        } else if let Some(lua) = lua_rt::Lua::from_program_name(&*name) {
+        let program: std::ffi::OsString = if let Ok(path) = which::which(name) {
+            path.into()
+        } else if let Some(lua) = lua_rt::Lua::from_program_name(name) {
             let path = self.temp_dir.path().join(lua.recommended_program_name());
             lua.write(&path)?;
-            std::rc::Rc::new(path.into())
+            path.into()
         } else {
-            std::rc::Rc::clone(&name)
+            name.into()
         };
-        self.lua_programs
+        self.program_cache
             .borrow_mut()
-            .insert(name, std::rc::Rc::clone(&program));
+            .insert(name.to_os_string(), program.clone());
         Ok(program)
     }
 }
