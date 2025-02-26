@@ -36,11 +36,27 @@ impl Process {
             .current_dir(cx.root_dir());
         log::debug!("lua command: {}", cmd.display().env(true));
 
-        let child = cmd
-            .build()
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()?;
+        let child = loop {
+            match cmd
+                .build()
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+            {
+                Ok(child) => {
+                    break child;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::ResourceBusy => {
+                    log::warn!("failed to spawn the command: {e}");
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    log::info!("retrying to spawn...");
+                }
+                Err(e) => {
+                    log::error!("failed to spawn the command: {e}");
+                    return Err(e);
+                }
+            }
+        };
         log::info!("process spawned as {}", child.id());
 
         Ok(Self {
