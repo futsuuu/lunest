@@ -28,24 +28,35 @@ impl Process {
         let input_path = temp_dir.join("in.jsonl");
         let output_path = temp_dir.join("out.jsonl");
 
-        let mut cmd = profile.lua_command(cx)?;
-        cmd.arg(cx.get_main_script());
-        log::debug!(
-            "lua command: {} {}",
-            cmd.get_program().to_string_lossy(),
-            cmd.get_args()
-                .map(|s| s.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-
-        let child = cmd
+        let mut cmd = profile.lua_command().clone();
+        cmd.program(cx.get_lua_program(cmd.get_program())?)
+            .arg(cx.get_main_script())
             .env("LUNEST_IN", &input_path)
             .env("LUNEST_OUT", &output_path)
-            .current_dir(cx.root_dir())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()?;
+            .current_dir(cx.root_dir());
+        log::debug!("lua command: {}", cmd.display().env(true));
+
+        let child = loop {
+            match cmd
+                .build()
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+            {
+                Ok(child) => {
+                    break child;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::ResourceBusy => {
+                    log::warn!("failed to spawn the command: {e}");
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    log::info!("retrying to spawn...");
+                }
+                Err(e) => {
+                    log::error!("failed to spawn the command: {e}");
+                    return Err(e);
+                }
+            }
+        };
         log::info!("process spawned as {}", child.id());
 
         Ok(Self {
