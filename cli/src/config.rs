@@ -183,8 +183,7 @@ pub struct Profile {
     name: String,
     init_script: Option<std::path::PathBuf>,
     target_files: Vec<std::path::PathBuf>,
-    lua_program: String,
-    lua_args: Vec<String>,
+    lua_command: crate::command::Builder,
 }
 
 impl Profile {
@@ -200,13 +199,8 @@ impl Profile {
         &self.target_files
     }
 
-    pub fn lua_command(
-        &self,
-        cx: &crate::global::Context,
-    ) -> std::io::Result<std::process::Command> {
-        let mut c = std::process::Command::new(cx.get_lua_program(&self.lua_program)?);
-        c.args(&self.lua_args);
-        Ok(c)
+    pub fn lua_command(&self) -> &crate::command::Builder {
+        &self.lua_command
     }
 
     fn from_spec(
@@ -226,13 +220,18 @@ impl Profile {
             &spec.exclude.unwrap_or_default(),
             init_script.as_ref(),
         )?;
-        let lua = spec.lua.as_ref().unwrap();
         Ok(Self {
             name,
             init_script,
             target_files,
-            lua_program: lua.first().context("'lua' field is empty")?.to_string(),
-            lua_args: lua.get(1..).unwrap_or_default().to_vec(),
+            lua_command: {
+                let lua = spec.lua.as_ref().unwrap();
+                let mut cmd = crate::command::Builder::new(
+                    lua.first().context("'lua' field must not be empty")?,
+                );
+                cmd.args(lua.get(1..).unwrap_or_default());
+                cmd
+            },
         })
     }
 }
@@ -300,10 +299,11 @@ mod profile_tests {
             ..Default::default()
         };
         let p = Profile::from_spec("name".into(), spec, root_dir.path()).unwrap();
-        assert_eq!(String::from("foo"), p.lua_program);
         assert_eq!(
-            vec![String::from("hello world"), String::from("!")],
-            p.lua_args
+            crate::command::Builder::new("foo")
+                .args(["hello world", "!"])
+                .clone(),
+            p.lua_command
         );
     }
 

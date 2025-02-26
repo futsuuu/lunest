@@ -1,4 +1,5 @@
 mod buffer;
+mod command;
 mod config;
 mod global;
 mod process;
