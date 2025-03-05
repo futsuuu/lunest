@@ -49,7 +49,7 @@ impl Process {
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::ResourceBusy => {
                     log::warn!("failed to spawn the command: {e}");
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     log::info!("retrying to spawn...");
                 }
                 Err(e) => {
