@@ -9,14 +9,16 @@ use std::io::Write;
 use clap::Parser;
 use crossterm::style::Stylize;
 
-fn main() -> anyhow::Result<std::process::ExitCode> {
+#[tokio::main]
+async fn main() -> anyhow::Result<std::process::ExitCode> {
     init_logger();
     log::info!("start");
-    match Args::parse() {
-        Args::Run(c) => c.exec(),
-        Args::List(c) => c.exec(),
-        Args::Wrapper(c) => c.exec(),
-    }
+    let code = match Args::parse() {
+        Args::Run(c) => c.exec().await?,
+        Args::List(c) => c.exec().await?,
+        Args::Wrapper(c) => c.exec()?,
+    };
+    Ok(code)
 }
 
 fn init_logger() {
@@ -48,7 +50,7 @@ struct RunCommand {
 }
 
 impl RunCommand {
-    fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
+    async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'run' command");
 
         let cx = global::Context::new(&self.cx_opts)?;
@@ -58,7 +60,7 @@ impl RunCommand {
             if i != 0 {
                 println!();
             }
-            if !run(&cx, profile)? {
+            if !run(&cx, profile).await? {
                 has_error = true;
             }
         }
@@ -70,41 +72,48 @@ impl RunCommand {
     }
 }
 
-fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> {
+async fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile.name().bold());
 
-    let mut process = process::Process::spawn(cx, profile)?;
+    let mut process = process::Process::spawn(cx, profile).await?;
 
-    process.write(&process::Input::Initialize {
-        root_dir: cx.root_dir().to_path_buf(),
-        target_files: profile
-            .target_files()
-            .iter()
-            .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
-            .collect(),
-        term_width: crossterm::terminal::size().map_or(60, |size| size.0),
-    })?;
+    process
+        .write(&process::Input::Initialize {
+            root_dir: cx.root_dir().to_path_buf(),
+            target_files: profile
+                .target_files()
+                .iter()
+                .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+                .collect(),
+            term_width: crossterm::terminal::size().map_or(60, |size| size.0),
+        })
+        .await?;
 
     if let Some(script) = profile.init_script() {
-        process.write(&process::Input::Execute(script.to_path_buf()))?;
+        process
+            .write(&process::Input::Execute(script.to_path_buf()))
+            .await?;
     }
 
-    let ids = get_test_list(&mut process)?
+    let ids = get_test_list(&mut process)
+        .await?
         .into_iter()
         .map(|info| info.id)
         .collect::<Vec<_>>();
     println!("found {} tests", ids.len());
-    process.write(&process::Input::Run {
-        test_id_filter: Some(ids),
-        test_mode: process::TestMode::Run,
-    })?;
-    process.write(&process::Input::Finish)?;
+    process
+        .write(&process::Input::Run {
+            test_id_filter: Some(ids),
+            test_mode: process::TestMode::Run,
+        })
+        .await?;
+    process.write(&process::Input::Finish).await?;
 
     let mut results = Vec::new();
     println!();
 
     loop {
-        let Some(output) = process.read()? else {
+        let Some(output) = process.read().await? else {
             if process.is_running()? {
                 continue;
             } else {
@@ -142,7 +151,7 @@ struct ListCommand {
 }
 
 impl ListCommand {
-    fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
+    async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'list' command");
 
         let cx = global::Context::new(&self.cx_opts)?;
@@ -151,32 +160,36 @@ impl ListCommand {
             if i != 0 {
                 println!();
             }
-            list(&cx, profile)?;
+            list(&cx, profile).await?;
         }
         Ok(std::process::ExitCode::SUCCESS)
     }
 }
 
-fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
+async fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
     println!("run with profile '{}'", profile.name().bold());
 
-    let mut process = process::Process::spawn(cx, profile)?;
+    let mut process = process::Process::spawn(cx, profile).await?;
 
-    process.write(&process::Input::Initialize {
-        root_dir: cx.root_dir().to_path_buf(),
-        target_files: profile
-            .target_files()
-            .iter()
-            .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
-            .collect(),
-        term_width: crossterm::terminal::size().map_or(60, |size| size.0),
-    })?;
+    process
+        .write(&process::Input::Initialize {
+            root_dir: cx.root_dir().to_path_buf(),
+            target_files: profile
+                .target_files()
+                .iter()
+                .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+                .collect(),
+            term_width: crossterm::terminal::size().map_or(60, |size| size.0),
+        })
+        .await?;
     if let Some(script) = profile.init_script() {
-        process.write(&process::Input::Execute(script.to_path_buf()))?;
+        process
+            .write(&process::Input::Execute(script.to_path_buf()))
+            .await?;
     }
 
     println!();
-    let test_list = get_test_list(&mut process)?;
+    let test_list = get_test_list(&mut process).await?;
     for info in &test_list {
         println!("{info}");
     }
@@ -184,15 +197,17 @@ fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_test_list(process: &mut process::Process) -> anyhow::Result<Vec<process::TestInfo>> {
-    process.write(&process::Input::Run {
-        test_id_filter: None,
-        test_mode: process::TestMode::SendInfo,
-    })?;
+async fn get_test_list(process: &mut process::Process) -> anyhow::Result<Vec<process::TestInfo>> {
+    process
+        .write(&process::Input::Run {
+            test_id_filter: None,
+            test_mode: process::TestMode::SendInfo,
+        })
+        .await?;
 
     let mut list = Vec::new();
     loop {
-        let Some(output) = process.read()? else {
+        let Some(output) = process.read().await? else {
             anyhow::ensure!(process.is_running()?);
             continue;
         };

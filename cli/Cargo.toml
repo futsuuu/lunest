@@ -22,6 +22,18 @@ toml = { version = "0.8", default-features = false, features = ["parse"] }
 walkdir.workspace = true
 which = "7.0"
 
+[dependencies.tokio]
+version = "1.43"
+features = [
+    "fs",
+    "io-util",
+    "macros",
+    "process",
+    "rt-multi-thread",
+    "sync",
+    "time",
+]
+
 [dev-dependencies]
 rstest = { version = "0.24", default-features = false }
 
