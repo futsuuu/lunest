@@ -1,12 +1,13 @@
-use std::{fmt, io::Write};
+use std::fmt;
 
 use crossterm::{style::Stylize, terminal};
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 pub struct Process {
     inner: Option<std::process::Child>,
-    input: std::fs::File,
-    output: crate::buffer::LineReader<std::fs::File>,
+    input: tokio::fs::File,
+    output: tokio::io::Lines<tokio::io::BufReader<tokio::fs::File>>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -18,7 +19,7 @@ pub enum Error {
 }
 
 impl Process {
-    pub fn spawn(
+    pub async fn spawn(
         cx: &crate::global::Context,
         profile: &crate::config::Profile,
     ) -> Result<Self, std::io::Error> {
@@ -61,37 +62,36 @@ impl Process {
 
         Ok(Self {
             inner: Some(child),
-            input: std::fs::File::options()
+            input: tokio::fs::File::options()
                 .create_new(true)
                 .append(true)
-                .open(input_path)?,
+                .open(input_path)
+                .await?,
             output: {
-                std::fs::File::create(&output_path)?;
-                std::fs::File::open(output_path)?.into()
+                tokio::fs::File::create(&output_path).await?;
+                tokio::io::BufReader::new(tokio::fs::File::open(output_path).await?).lines()
             },
         })
     }
 
-    pub fn read(&mut self) -> Result<Option<Output>, std::io::Error> {
-        let output = match self.output.read_line()? {
-            crate::buffer::Line::Ok(s) => {
-                let out = serde_json::from_str(&s).expect("failed to deserialize an output");
-                match &out {
-                    Output::Log(s) => log::info!("[log] {s}"),
-                    _ => log::debug!("output read: {out:?}"),
-                }
-                Some(out)
-            }
-            crate::buffer::Line::NoLF | crate::buffer::Line::Empty => None,
+    pub async fn read(&mut self) -> Result<Option<Output>, std::io::Error> {
+        let Some(s) = self.output.next_line().await? else {
+            return Ok(None);
         };
-        Ok(output)
+        let out = serde_json::from_str(&s).expect("failed to deserialize an output");
+        match &out {
+            Output::Log(s) => log::info!("[log] {s}"),
+            _ => log::debug!("output read: {out:?}"),
+        }
+        Ok(Some(out))
     }
 
-    pub fn write(&mut self, input: &Input) -> Result<(), std::io::Error> {
+    pub async fn write(&mut self, input: &Input) -> Result<(), std::io::Error> {
         log::debug!("writing input: {input:?}");
         let mut json = serde_json::to_vec(input).expect("failed to serialize an input");
         json.extend(b"\n");
-        self.input.write_all(&json)
+        self.input.write_all(&json).await?;
+        Ok(())
     }
 
     pub fn is_running(&mut self) -> Result<bool, Error> {
