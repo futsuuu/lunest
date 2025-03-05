@@ -1,6 +1,6 @@
 use tokio::io::AsyncBufReadExt;
 
-pub struct AsyncLineReader<R: tokio::io::AsyncRead> {
+pub struct AsyncLineReader<R> {
     reader: tokio::io::BufReader<R>,
     buffer: String,
 }
@@ -12,14 +12,16 @@ pub enum Line {
     NoLF,
 }
 
-impl<R: tokio::io::AsyncRead + std::marker::Unpin> AsyncLineReader<R> {
+impl<R: tokio::io::AsyncRead> AsyncLineReader<R> {
     pub fn new(reader: R) -> Self {
         Self {
             reader: tokio::io::BufReader::new(reader),
             buffer: String::new(),
         }
     }
+}
 
+impl<R: tokio::io::AsyncRead + std::marker::Unpin> AsyncLineReader<R> {
     pub async fn read_line(&mut self) -> std::io::Result<Line> {
         Ok(if self.reader.read_line(&mut self.buffer).await? == 0 {
             Line::Empty
@@ -45,7 +47,7 @@ impl<R: tokio::io::AsyncRead> std::ops::DerefMut for AsyncLineReader<R> {
     }
 }
 
-impl<R: tokio::io::AsyncRead + std::marker::Unpin> std::convert::From<R> for AsyncLineReader<R> {
+impl<R: tokio::io::AsyncRead> std::convert::From<R> for AsyncLineReader<R> {
     fn from(value: R) -> Self {
         Self::new(value)
     }
@@ -68,7 +70,10 @@ mod line_buf_reader_tests {
         let mut r = AsyncLineReader::new(std::io::Cursor::new(b"abc".to_vec()));
         assert_eq!(Line::NoLF, r.read_line().await.unwrap());
         r.get_mut().get_mut().extend(b"def\n");
-        assert_eq!(Line::Ok(String::from("abcdef\n")), r.read_line().await.unwrap());
+        assert_eq!(
+            Line::Ok(String::from("abcdef\n")),
+            r.read_line().await.unwrap()
+        );
     }
 
     #[tokio::test]
