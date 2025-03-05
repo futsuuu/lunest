@@ -2,12 +2,12 @@ use std::fmt;
 
 use crossterm::{style::Stylize, terminal};
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 pub struct Process {
     inner: Option<std::process::Child>,
     input: tokio::fs::File,
-    output: tokio::io::Lines<tokio::io::BufReader<tokio::fs::File>>,
+    output: crate::buffer::AsyncLineReader<tokio::fs::File>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -69,21 +69,24 @@ impl Process {
                 .await?,
             output: {
                 tokio::fs::File::create(&output_path).await?;
-                tokio::io::BufReader::new(tokio::fs::File::open(output_path).await?).lines()
+                tokio::fs::File::open(output_path).await?.into()
             },
         })
     }
 
     pub async fn read(&mut self) -> Result<Option<Output>, std::io::Error> {
-        let Some(s) = self.output.next_line().await? else {
-            return Ok(None);
+        let output = match self.output.read_line().await? {
+            crate::buffer::Line::Ok(s) => {
+                let out = serde_json::from_str(&s).expect("failed to deserialize an output");
+                match &out {
+                    Output::Log(s) => log::info!("[log] {s}"),
+                    _ => log::debug!("output read: {out:?}"),
+                }
+                Some(out)
+            }
+            crate::buffer::Line::NoLF | crate::buffer::Line::Empty => None,
         };
-        let out = serde_json::from_str(&s).expect("failed to deserialize an output");
-        match &out {
-            Output::Log(s) => log::info!("[log] {s}"),
-            _ => log::debug!("output read: {out:?}"),
-        }
-        Ok(Some(out))
+        Ok(output)
     }
 
     pub async fn write(&mut self, input: &Input) -> Result<(), std::io::Error> {
