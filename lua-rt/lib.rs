@@ -116,9 +116,22 @@ mod tests {
         let p = t.path().join(lua.recommended_program_name());
         lua.write(&p)?;
         std::fs::write(t.path().join("a.lua"), "print(_VERSION)\n")?;
-        let out = std::process::Command::new(p)
-            .arg(t.path().join("a.lua"))
-            .output()?;
+        let out = loop {
+            match std::process::Command::new(&p)
+                .arg(t.path().join("a.lua"))
+                .output()
+            {
+                Ok(out) => {
+                    break out;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::ResourceBusy => {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        };
         assert!(out.status.success());
         #[cfg(unix)]
         assert_eq!(out.stdout, Vec::from(format!("{version}\n")));
