@@ -307,7 +307,6 @@ dependencies = [
  "bstr",
  "regex-automata",
  "regex-syntax",
- "serde",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@ mod command;
 mod config;
 mod global;
 mod process;
+mod profile;
 
 use std::io::Write;
 
@@ -72,7 +73,7 @@ impl RunCommand {
     }
 }
 
-async fn run(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<bool> {
+async fn run(cx: &global::Context, profile: &profile::Profile) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile.name().bold());
 
     let mut process = process::Process::spawn(cx, profile).await?;
@@ -166,7 +167,7 @@ impl ListCommand {
     }
 }
 
-async fn list(cx: &global::Context, profile: &config::Profile) -> anyhow::Result<()> {
+async fn list(cx: &global::Context, profile: &profile::Profile) -> anyhow::Result<()> {
     println!("run with profile '{}'", profile.name().bold());
 
     let mut process = process::Process::spawn(cx, profile).await?;
@@ -239,7 +240,7 @@ impl Profiles {
     fn collect<'a>(
         &'a self,
         config: &'a config::Config,
-    ) -> anyhow::Result<Vec<&'a config::Profile>> {
+    ) -> anyhow::Result<Vec<&'a profile::Profile>> {
         let mut ps = Vec::new();
         for profile in &self.profile {
             ps.push(config.profile(profile)?);
