@@ -1,7 +1,7 @@
+mod app;
 mod buffer;
 mod command;
 mod config;
-mod global;
 mod process;
 mod profile;
 
@@ -47,14 +47,14 @@ struct RunCommand {
     #[clap(flatten)]
     profiles: Profiles,
     #[clap(flatten)]
-    cx_opts: global::ContextOptions,
+    cx_opts: app::ContextOptions,
 }
 
 impl RunCommand {
     async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'run' command");
 
-        let cx = global::Context::new(&self.cx_opts)?;
+        let cx = app::Context::new(&self.cx_opts)?;
 
         let mut has_error = false;
         for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {
@@ -73,7 +73,7 @@ impl RunCommand {
     }
 }
 
-async fn run(cx: &global::Context, profile: &profile::Profile) -> anyhow::Result<bool> {
+async fn run(cx: &app::Context, profile: &profile::Profile) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile.name().bold());
 
     let mut process = process::Process::spawn(cx, profile).await?;
@@ -148,14 +148,14 @@ struct ListCommand {
     #[clap(flatten)]
     profiles: Profiles,
     #[clap(flatten)]
-    cx_opts: global::ContextOptions,
+    cx_opts: app::ContextOptions,
 }
 
 impl ListCommand {
     async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'list' command");
 
-        let cx = global::Context::new(&self.cx_opts)?;
+        let cx = app::Context::new(&self.cx_opts)?;
 
         for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {
             if i != 0 {
@@ -167,7 +167,7 @@ impl ListCommand {
     }
 }
 
-async fn list(cx: &global::Context, profile: &profile::Profile) -> anyhow::Result<()> {
+async fn list(cx: &app::Context, profile: &profile::Profile) -> anyhow::Result<()> {
     println!("run with profile '{}'", profile.name().bold());
 
     let mut process = process::Process::spawn(cx, profile).await?;

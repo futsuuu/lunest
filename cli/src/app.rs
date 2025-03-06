@@ -17,7 +17,7 @@ pub struct ContextOptions {
 
 impl Context {
     pub fn new(opts: &ContextOptions) -> anyhow::Result<Self> {
-        log::trace!("creating new global context");
+        log::trace!("creating new app context");
         let config = crate::config::Config::read()?;
         let temp_dir = tempfile::Builder::new()
             .prefix(env!("CARGO_PKG_NAME"))

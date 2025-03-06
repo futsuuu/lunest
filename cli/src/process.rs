@@ -20,7 +20,7 @@ pub enum Error {
 
 impl Process {
     pub async fn spawn(
-        cx: &crate::global::Context,
+        cx: &crate::app::Context,
         profile: &crate::profile::Profile,
     ) -> Result<Self, std::io::Error> {
         log::trace!("spawning new process");
