@@ -38,8 +38,10 @@ impl Profile {
         });
         let target_files = target_files(
             root_dir,
-            &spec.include.unwrap_or_default(),
-            &spec.exclude.unwrap_or_default(),
+            &GlobSet::new(
+                spec.include.unwrap_or_default().as_slice(),
+                spec.exclude.unwrap_or_default().as_slice(),
+            )?,
             init_script.as_ref(),
         )?;
         Ok(Self {
@@ -58,26 +60,121 @@ impl Profile {
     }
 }
 
+#[derive(Debug)]
+struct GlobSet {
+    included_dirs: globset::GlobSet,
+    included_files: globset::GlobSet,
+    excluded_files: globset::GlobSet,
+}
+
+impl GlobSet {
+    fn new(include: &[String], exclude: &[String]) -> Result<Self, globset::Error> {
+        let mut included_dirs = globset::GlobSetBuilder::new();
+        let mut included_files = globset::GlobSetBuilder::new();
+        let mut pattern_set = std::collections::HashSet::new();
+        for file_pattern in include {
+            if !pattern_set.contains(file_pattern) {
+                included_files.add(new_glob(file_pattern)?);
+                pattern_set.insert(file_pattern.to_string());
+            }
+            for slash_index in file_pattern
+                .char_indices()
+                .filter_map(|(i, c)| (c == '/').then_some(i))
+            {
+                let dir_pattern = file_pattern.get(..slash_index).unwrap();
+                if !pattern_set.contains(dir_pattern) {
+                    included_dirs.add(new_glob(dir_pattern)?);
+                    pattern_set.insert(dir_pattern.to_string());
+                }
+            }
+        }
+        let mut excluded_files = globset::GlobSetBuilder::new();
+        for file_pattern in exclude {
+            excluded_files.add(new_glob(file_pattern)?);
+        }
+        Ok(Self {
+            included_dirs: included_dirs.build()?,
+            included_files: included_files.build()?,
+            excluded_files: excluded_files.build()?,
+        })
+    }
+
+    fn is_match(&self, relative_path: &std::path::Path, is_directory: bool) -> bool {
+        if is_directory {
+            self.included_dirs.is_match(relative_path)
+        } else {
+            self.included_files.is_match(relative_path)
+                && !self.excluded_files.is_match(relative_path)
+        }
+    }
+}
+
+fn new_glob(glob: &str) -> Result<globset::Glob, globset::Error> {
+    globset::GlobBuilder::new(glob)
+        .empty_alternates(true)
+        .literal_separator(true)
+        .build()
+}
+
+fn is_entry_valid(entry: &walkdir::DirEntry) -> bool {
+    entry.file_type().is_file() || entry.file_type().is_dir()
+}
+
+fn is_entry_init_script(
+    entry: &walkdir::DirEntry,
+    init_script: Option<&std::path::PathBuf>,
+) -> bool {
+    init_script.is_some_and(|p| p == entry.path() && entry.file_type().is_file())
+}
+
+#[cfg(test)]
+mod globset_tests {
+    use super::*;
+
+    #[test]
+    fn match_file_without_excluding() {
+        let p = GlobSet::new(&["**/*.lua".into()], &[]).unwrap();
+        assert!(p.is_match(std::path::Path::new("a.lua"), false));
+        assert!(p.is_match(std::path::Path::new("a/b.lua"), false));
+        assert!(!p.is_match(std::path::Path::new("a.txt"), false));
+    }
+
+    #[test]
+    fn match_file_with_excluding() {
+        let p = GlobSet::new(&["**/*.lua".into()], &["a/*.lua".into()]).unwrap();
+        assert!(p.is_match(std::path::Path::new("a.lua"), false));
+        assert!(!p.is_match(std::path::Path::new("a/b.lua"), false));
+        assert!(p.is_match(std::path::Path::new("a/b/c.lua"), false));
+    }
+
+    #[test]
+    fn match_directory() {
+        let p = GlobSet::new(&["a/**/*.lua".into()], &["a*/**/*.lua".into()]).unwrap();
+        assert!(p.is_match(std::path::Path::new("a/b"), true));
+        assert!(!p.is_match(std::path::Path::new("b/c"), true));
+    }
+}
+
 fn target_files(
     root_dir: &std::path::Path,
-    include: &globset::GlobSet,
-    exclude: &globset::GlobSet,
+    globset: &GlobSet,
     init_script: Option<&std::path::PathBuf>,
 ) -> std::io::Result<Vec<std::path::PathBuf>> {
     log::trace!("reading target files");
     let mut r = Vec::new();
     for entry in walkdir::WalkDir::new(root_dir)
+        .min_depth(1)
         .follow_links(true)
         .sort_by_file_name()
         .into_iter()
         .filter_entry(|entry| {
-            let path = entry.path().strip_prefix(root_dir).unwrap();
-            if exclude.is_match(path) || init_script.is_some_and(|init| init == path) {
+            if !is_entry_valid(entry) || is_entry_init_script(entry, init_script) {
                 false
-            } else if entry.file_type().is_dir() {
-                true
             } else {
-                include.is_match(path)
+                globset.is_match(
+                    entry.path().strip_prefix(root_dir).unwrap(),
+                    entry.file_type().is_dir(),
+                )
             }
         })
     {
@@ -93,30 +190,20 @@ fn target_files(
 #[derive(Clone, Debug, serde::Deserialize, merge::Merge)]
 pub struct Specifier {
     pub lua: Option<Vec<String>>,
-    pub include: Option<globset::GlobSet>,
-    pub exclude: Option<globset::GlobSet>,
+    pub include: Option<Vec<String>>,
+    pub exclude: Option<Vec<String>>,
     pub init: Option<std::path::PathBuf>,
 }
 
 impl Default for Specifier {
     fn default() -> Self {
-        static DEFAULT: std::sync::OnceLock<Specifier> = std::sync::OnceLock::new();
-        let default = DEFAULT.get_or_init(|| Self {
+        Self {
             lua: Some(vec!["lua".into()]),
-            include: Some(build_globset(&["{src,lua}/**/*.lua"]).unwrap()),
-            exclude: Some(globset::GlobSet::empty()),
+            include: Some(vec!["{src,lua}/**/*.lua".into()]),
+            exclude: Some(vec![]),
             init: None,
-        });
-        default.clone()
+        }
     }
-}
-
-fn build_globset(patterns: &[&str]) -> Result<globset::GlobSet, globset::Error> {
-    let mut builder = globset::GlobSetBuilder::new();
-    for glob in patterns {
-        builder.add(globset::Glob::new(glob)?);
-    }
-    builder.build()
 }
 
 #[cfg(test)]
@@ -177,8 +264,10 @@ mod tests {
             ],
             target_files(
                 root,
-                &build_globset(&["lua/**/*.lua", "test/a*.lua"])?,
-                &build_globset(&["lua/hello.lua"])?,
+                &GlobSet::new(
+                    &["lua/**/*.lua".into(), "test/a*.lua".into()],
+                    &["lua/hello.lua".into()]
+                )?,
                 None,
             )?,
         );
@@ -192,9 +281,8 @@ mod tests {
             vec![root.join("test").join("bcd.lua")],
             target_files(
                 root,
-                &build_globset(&["test/**/*.lua"])?,
-                &build_globset(&[])?,
-                Some(&std::path::PathBuf::from("test/abc.lua")),
+                &GlobSet::new(&["test/**/*.lua".into()], &[])?,
+                Some(&root.join("test/abc.lua")),
             )?,
         );
         Ok(())
