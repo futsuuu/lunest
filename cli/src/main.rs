@@ -1,7 +1,6 @@
+mod app;
 mod buffer;
 mod command;
-mod config;
-mod global;
 mod process;
 mod profile;
 
@@ -45,23 +44,21 @@ enum Args {
 #[derive(clap::Args, Debug)]
 struct RunCommand {
     #[clap(flatten)]
-    profiles: Profiles,
-    #[clap(flatten)]
-    cx_opts: global::ContextOptions,
+    app_options: app::Options,
 }
 
 impl RunCommand {
-    async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
+    async fn exec(self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'run' command");
 
-        let cx = global::Context::new(&self.cx_opts)?;
+        let app = app::App::new(self.app_options)?;
 
         let mut has_error = false;
-        for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {
+        for (i, profile) in app.profiles().iter().enumerate() {
             if i != 0 {
                 println!();
             }
-            if !run(&cx, profile).await? {
+            if !run(&app, profile).await? {
                 has_error = true;
             }
         }
@@ -73,18 +70,18 @@ impl RunCommand {
     }
 }
 
-async fn run(cx: &global::Context, profile: &profile::Profile) -> anyhow::Result<bool> {
+async fn run(app: &app::App, profile: &profile::Profile) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile.name().bold());
 
-    let mut process = process::Process::spawn(cx, profile).await?;
+    let mut process = process::Process::spawn(app, profile).await?;
 
     process
         .write(&process::Input::Initialize {
-            root_dir: cx.root_dir().to_path_buf(),
+            root_dir: app.root_dir().to_path_buf(),
             target_files: profile
                 .target_files()
                 .iter()
-                .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+                .map(|p| process::TargetFile::from_path(p.to_path_buf(), app.root_dir()))
                 .collect(),
             term_width: crossterm::terminal::size().map_or(60, |size| size.0),
         })
@@ -146,39 +143,37 @@ async fn run(cx: &global::Context, profile: &profile::Profile) -> anyhow::Result
 #[derive(clap::Args, Debug)]
 struct ListCommand {
     #[clap(flatten)]
-    profiles: Profiles,
-    #[clap(flatten)]
-    cx_opts: global::ContextOptions,
+    app_context_options: app::Options,
 }
 
 impl ListCommand {
-    async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
+    async fn exec(self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'list' command");
 
-        let cx = global::Context::new(&self.cx_opts)?;
+        let app = app::App::new(self.app_context_options)?;
 
-        for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {
+        for (i, profile) in app.profiles().iter().enumerate() {
             if i != 0 {
                 println!();
             }
-            list(&cx, profile).await?;
+            list(&app, profile).await?;
         }
         Ok(std::process::ExitCode::SUCCESS)
     }
 }
 
-async fn list(cx: &global::Context, profile: &profile::Profile) -> anyhow::Result<()> {
+async fn list(app: &app::App, profile: &profile::Profile) -> anyhow::Result<()> {
     println!("run with profile '{}'", profile.name().bold());
 
-    let mut process = process::Process::spawn(cx, profile).await?;
+    let mut process = process::Process::spawn(app, profile).await?;
 
     process
         .write(&process::Input::Initialize {
-            root_dir: cx.root_dir().to_path_buf(),
+            root_dir: app.root_dir().to_path_buf(),
             target_files: profile
                 .target_files()
                 .iter()
-                .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+                .map(|p| process::TargetFile::from_path(p.to_path_buf(), app.root_dir()))
                 .collect(),
             term_width: crossterm::terminal::size().map_or(60, |size| size.0),
         })
@@ -224,35 +219,6 @@ async fn get_test_list(process: &mut process::Process) -> anyhow::Result<Vec<pro
     }
 
     Ok(list)
-}
-
-#[derive(clap::Args, Debug)]
-struct Profiles {
-    /// Load Lua files with the specified profile
-    #[arg(long, short, value_delimiter = ',')]
-    profile: Vec<String>,
-    /// Load Lua files with the profiles in the specified group
-    #[arg(long, short, value_delimiter = ',')]
-    group: Vec<String>,
-}
-
-impl Profiles {
-    fn collect<'a>(
-        &'a self,
-        config: &'a config::Config,
-    ) -> anyhow::Result<Vec<&'a profile::Profile>> {
-        let mut ps = Vec::new();
-        for profile in &self.profile {
-            ps.push(config.profile(profile)?);
-        }
-        for group in &self.group {
-            ps.extend(config.group(group)?);
-        }
-        if ps.is_empty() {
-            ps.push(config.default_profile()?);
-        }
-        Ok(ps)
-    }
 }
 
 #[derive(clap::Args, Debug)]
