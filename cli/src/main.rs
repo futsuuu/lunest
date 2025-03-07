@@ -1,7 +1,6 @@
 mod app;
 mod buffer;
 mod command;
-mod config;
 mod process;
 mod profile;
 
@@ -45,19 +44,17 @@ enum Args {
 #[derive(clap::Args, Debug)]
 struct RunCommand {
     #[clap(flatten)]
-    profiles: Profiles,
-    #[clap(flatten)]
-    cx_opts: app::ContextOptions,
+    app_context_options: app::ContextOptions,
 }
 
 impl RunCommand {
-    async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
+    async fn exec(self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'run' command");
 
-        let cx = app::Context::new(&self.cx_opts)?;
+        let cx = app::Context::new(self.app_context_options)?;
 
         let mut has_error = false;
-        for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {
+        for (i, profile) in cx.profiles().iter().enumerate() {
             if i != 0 {
                 println!();
             }
@@ -146,18 +143,16 @@ async fn run(cx: &app::Context, profile: &profile::Profile) -> anyhow::Result<bo
 #[derive(clap::Args, Debug)]
 struct ListCommand {
     #[clap(flatten)]
-    profiles: Profiles,
-    #[clap(flatten)]
-    cx_opts: app::ContextOptions,
+    app_context_options: app::ContextOptions,
 }
 
 impl ListCommand {
-    async fn exec(&self) -> anyhow::Result<std::process::ExitCode> {
+    async fn exec(self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'list' command");
 
-        let cx = app::Context::new(&self.cx_opts)?;
+        let cx = app::Context::new(self.app_context_options)?;
 
-        for (i, profile) in self.profiles.collect(cx.config())?.iter().enumerate() {
+        for (i, profile) in cx.profiles().iter().enumerate() {
             if i != 0 {
                 println!();
             }
@@ -224,35 +219,6 @@ async fn get_test_list(process: &mut process::Process) -> anyhow::Result<Vec<pro
     }
 
     Ok(list)
-}
-
-#[derive(clap::Args, Debug)]
-struct Profiles {
-    /// Load Lua files with the specified profile
-    #[arg(long, short, value_delimiter = ',')]
-    profile: Vec<String>,
-    /// Load Lua files with the profiles in the specified group
-    #[arg(long, short, value_delimiter = ',')]
-    group: Vec<String>,
-}
-
-impl Profiles {
-    fn collect<'a>(
-        &'a self,
-        config: &'a config::Config,
-    ) -> anyhow::Result<Vec<&'a profile::Profile>> {
-        let mut ps = Vec::new();
-        for profile in &self.profile {
-            ps.push(config.profile(profile)?);
-        }
-        for group in &self.group {
-            ps.extend(config.group(group)?);
-        }
-        if ps.is_empty() {
-            ps.push(config.default_profile()?);
-        }
-        Ok(ps)
-    }
 }
 
 #[derive(clap::Args, Debug)]
