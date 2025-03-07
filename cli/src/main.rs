@@ -44,21 +44,21 @@ enum Args {
 #[derive(clap::Args, Debug)]
 struct RunCommand {
     #[clap(flatten)]
-    app_context_options: app::ContextOptions,
+    app_options: app::Options,
 }
 
 impl RunCommand {
     async fn exec(self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'run' command");
 
-        let cx = app::Context::new(self.app_context_options)?;
+        let app = app::App::new(self.app_options)?;
 
         let mut has_error = false;
-        for (i, profile) in cx.profiles().iter().enumerate() {
+        for (i, profile) in app.profiles().iter().enumerate() {
             if i != 0 {
                 println!();
             }
-            if !run(&cx, profile).await? {
+            if !run(&app, profile).await? {
                 has_error = true;
             }
         }
@@ -70,18 +70,18 @@ impl RunCommand {
     }
 }
 
-async fn run(cx: &app::Context, profile: &profile::Profile) -> anyhow::Result<bool> {
+async fn run(app: &app::App, profile: &profile::Profile) -> anyhow::Result<bool> {
     println!("run with profile '{}'", profile.name().bold());
 
-    let mut process = process::Process::spawn(cx, profile).await?;
+    let mut process = process::Process::spawn(app, profile).await?;
 
     process
         .write(&process::Input::Initialize {
-            root_dir: cx.root_dir().to_path_buf(),
+            root_dir: app.root_dir().to_path_buf(),
             target_files: profile
                 .target_files()
                 .iter()
-                .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+                .map(|p| process::TargetFile::from_path(p.to_path_buf(), app.root_dir()))
                 .collect(),
             term_width: crossterm::terminal::size().map_or(60, |size| size.0),
         })
@@ -143,37 +143,37 @@ async fn run(cx: &app::Context, profile: &profile::Profile) -> anyhow::Result<bo
 #[derive(clap::Args, Debug)]
 struct ListCommand {
     #[clap(flatten)]
-    app_context_options: app::ContextOptions,
+    app_context_options: app::Options,
 }
 
 impl ListCommand {
     async fn exec(self) -> anyhow::Result<std::process::ExitCode> {
         log::trace!("executing 'list' command");
 
-        let cx = app::Context::new(self.app_context_options)?;
+        let app = app::App::new(self.app_context_options)?;
 
-        for (i, profile) in cx.profiles().iter().enumerate() {
+        for (i, profile) in app.profiles().iter().enumerate() {
             if i != 0 {
                 println!();
             }
-            list(&cx, profile).await?;
+            list(&app, profile).await?;
         }
         Ok(std::process::ExitCode::SUCCESS)
     }
 }
 
-async fn list(cx: &app::Context, profile: &profile::Profile) -> anyhow::Result<()> {
+async fn list(app: &app::App, profile: &profile::Profile) -> anyhow::Result<()> {
     println!("run with profile '{}'", profile.name().bold());
 
-    let mut process = process::Process::spawn(cx, profile).await?;
+    let mut process = process::Process::spawn(app, profile).await?;
 
     process
         .write(&process::Input::Initialize {
-            root_dir: cx.root_dir().to_path_buf(),
+            root_dir: app.root_dir().to_path_buf(),
             target_files: profile
                 .target_files()
                 .iter()
-                .map(|p| process::TargetFile::from_path(p.to_path_buf(), cx.root_dir()))
+                .map(|p| process::TargetFile::from_path(p.to_path_buf(), app.root_dir()))
                 .collect(),
             term_width: crossterm::terminal::size().map_or(60, |size| size.0),
         })

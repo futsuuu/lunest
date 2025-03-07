@@ -1,7 +1,7 @@
 use anyhow::Context as _;
 use merge::Merge as _;
 
-pub struct Context {
+pub struct App {
     root_dir: std::path::PathBuf,
     profiles: Vec<crate::profile::Profile>,
 
@@ -13,7 +13,7 @@ pub struct Context {
 }
 
 #[derive(clap::Args, Debug)]
-pub struct ContextOptions {
+pub struct Options {
     /// Load Lua files with the specified profile
     #[arg(long, short, value_delimiter = ',')]
     profile: Vec<String>,
@@ -25,8 +25,8 @@ pub struct ContextOptions {
     keep_tmpdir: bool,
 }
 
-impl Context {
-    pub fn new(opts: ContextOptions) -> anyhow::Result<Self> {
+impl App {
+    pub fn new(opts: Options) -> anyhow::Result<Self> {
         log::trace!("creating new app context");
 
         let (root_dir, config_file) = find_config_file(std::env::current_dir()?);

@@ -20,21 +20,21 @@ pub enum Error {
 
 impl Process {
     pub async fn spawn(
-        cx: &crate::app::Context,
+        app: &crate::app::App,
         profile: &crate::profile::Profile,
     ) -> Result<Self, std::io::Error> {
         log::trace!("spawning new process");
 
-        let temp_dir = cx.create_process_dir()?;
+        let temp_dir = app.create_process_dir()?;
         let input_path = temp_dir.join("in.jsonl");
         let output_path = temp_dir.join("out.jsonl");
 
         let mut cmd = profile.lua_command().clone();
-        cmd.program(cx.get_lua_program(cmd.get_program())?)
-            .arg(cx.get_main_script())
+        cmd.program(app.get_lua_program(cmd.get_program())?)
+            .arg(app.get_main_script())
             .env("LUNEST_IN", &input_path)
             .env("LUNEST_OUT", &output_path)
-            .current_dir(cx.root_dir());
+            .current_dir(app.root_dir());
         log::debug!("lua command: {}", cmd.display().env(true));
 
         let child = loop {
