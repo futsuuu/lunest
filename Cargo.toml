@@ -12,7 +12,7 @@ version = "0.0.0"
 edition = "2024"
 
 [workspace.dependencies]
-tempfile = "3.17"
+tempfile = "3.19"
 walkdir = "2.5"
 zstd = { version = "0.13", default-features = false }
 
