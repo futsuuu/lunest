@@ -33,7 +33,7 @@ jobs:
         with:
           cache-on-failure: true
 
-      - uses: mlugg/setup-zig@v1
+      - uses: mlugg/setup-zig@v2
 
       - name: cargo test
         run: cargo test --workspace --all-targets
@@ -57,7 +57,7 @@ jobs:
         with:
           cache-on-failure: true
 
-      - uses: mlugg/setup-zig@v1
+      - uses: mlugg/setup-zig@v2
 
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets
@@ -75,7 +75,7 @@ jobs:
         with:
           components: rustfmt
 
-      - uses: mlugg/setup-zig@v1
+      - uses: mlugg/setup-zig@v2
 
       - name: cargo fmt
         run: cargo fmt --all --check
