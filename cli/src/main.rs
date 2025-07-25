@@ -239,7 +239,7 @@ impl WrapperCommand {
             anyhow::ensure!(!path.exists(), "file already exists");
             std::fs::write(path, source)?;
         } else {
-            print!("{}", source);
+            print!("{source}");
         }
         Ok(std::process::ExitCode::SUCCESS)
     }

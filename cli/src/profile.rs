@@ -189,9 +189,13 @@ fn target_files(
 
 #[derive(Clone, Debug, serde::Deserialize, merge::Merge)]
 pub struct Specifier {
+    #[merge(strategy = merge::option::overwrite_none)]
     pub lua: Option<Vec<String>>,
+    #[merge(strategy = merge::option::overwrite_none)]
     pub include: Option<Vec<String>>,
+    #[merge(strategy = merge::option::overwrite_none)]
     pub exclude: Option<Vec<String>>,
+    #[merge(strategy = merge::option::overwrite_none)]
     pub init: Option<std::path::PathBuf>,
 }
 
