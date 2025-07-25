@@ -67,7 +67,7 @@ impl App {
 
     pub fn create_process_dir(&self) -> std::io::Result<std::path::PathBuf> {
         let counter = self.process_dir_counter.get();
-        let name = format!("p{:x}", counter);
+        let name = format!("p{counter:x}");
         self.process_dir_counter.set(counter + 1);
         let dir = self.temp_dir.path().join(name);
         std::fs::create_dir(&dir)?;
