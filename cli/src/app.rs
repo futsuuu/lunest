@@ -40,7 +40,7 @@ impl App {
 
         let temp_dir = tempfile::Builder::new()
             .prefix(env!("CARGO_PKG_NAME"))
-            .keep(opts.keep_tmpdir)
+            .disable_cleanup(opts.keep_tmpdir)
             .tempdir()?;
         let main_script = temp_dir.path().join("main.lua");
         std::fs::write(
