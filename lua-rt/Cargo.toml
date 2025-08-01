@@ -10,7 +10,7 @@ path = "lib.rs"
 zstd.workspace = true
 
 [dev-dependencies]
-rstest = { version = "0.25", default-features = false }
+rstest = { version = "0.26", default-features = false }
 tempfile.workspace = true
 
 [build-dependencies]
